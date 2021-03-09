@@ -1,7 +1,7 @@
 #!/bin/bash
 
 apt install apache2 mariadb-server gnupg lsb-release apt-transport-https ca-certificates
-wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php.apt/gpg
+wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
 echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | sudo tee /etc/apt/source.list.d/php.list
 apt update
 apt install php7.4 php7.4-mysql
