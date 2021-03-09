@@ -13,6 +13,7 @@ sudo wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gp
 echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/php.list
 
 3 package
+apt update
 php7.4
 php7.4-mysql
 
@@ -21,12 +22,13 @@ wget -O /tmp/wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-page
 chmod +x /tmp/wp-cli.phar
 sudo mv /tmp/wp-cli.phar /usr/local/bin/wp
 sudo wp cli update
-sudo wget -O /tmp/wp.tar.gz https://wordpress.org/latest.tar.gz
 sudo mkdir /var/www/site 
 sudo chown -R www-data:www-data /var/www/site
 
 5 Create DB
+
 6create and activate vhost on /var/www/site or redirect default on wordpress folder
+or rename index.html in /var/www/html
 
 7 install via cli
 cd /var/www/site/

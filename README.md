@@ -1,16 +1,17 @@
-#  magento_py 
+#  wp_py 
 
 Version : 1.0  
 
 Developped by : Michel LOCHE   
 
-Release date : 2021 jan 10th  
+Release date : 2021   
 
 #  UTILITY    
 
 This script written in Python3 will take care of installing all the packages required,  
- create the database and install Magento software in its community edition. Script has been tested and developped for Debian 10.
+ create the database and install wordpress website. Script has been tested and developped for Debian 10.
 
+### WORK IN PROGRESS ###
 
 # REQUISITES 
 
