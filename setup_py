@@ -1,0 +1,276 @@
+#!/bin/python3
+### Imports required module including custom modules in the ./modules/ folder ###
+
+#Standard modules#
+import apt
+import sys
+sys.path.append('./modules/')
+import yaml
+import os
+import shutil
+import subprocess
+import fileinput
+import logging
+from logging.handlers import RotatingFileHandler
+#Custom modules#
+import database as mariadb
+import files
+import recurchown
+
+print("#####################################\n###### {} IS STARTING ###### \n ".format(sys.argv[0]))
+
+
+### Function installing the package list given as variable ###
+def install_package(package_list):
+	if isinstance(package_list,(list,str)):
+#control	print("Updating cache and installing package, please wait !")
+		pkg_cache=apt.Cache()
+		pkg_cache.update()
+		pkg_cache.open(None)
+		pkg_cache.upgrade()
+		value=0
+		max=len(package_list)
+		for value in range(0,max):
+			try:
+				inst_pkg = pkg_cache[package_list[value]]
+				if inst_pkg.is_installed:
+					print("{} already installed".format(inst_pkg))
+				else:
+					inst_pkg.mark_install()
+					try:
+						pkg_cache.commit()
+					except arg:
+						sys.exit("Sorry, package install failed {}".format(str(arg)))
+			except KeyError:
+				print(" Package was not found" , inst_pkg[value])
+
+	else:
+		print("Install package requires a list of packages or a single package") 
+
+### using bash command list given as arg  ### 
+
+def command_use(list_cmd):
+#control	print("received commands in command_use are {} ".format(cmd))
+	if isinstance(list_cmd,(list,str)):
+		value=0
+		max=len(list_cmd)
+#control		print(max)
+		for value in range(0,max):
+			print(list_cmd[value])
+			try:
+				try_cmd=list_cmd[value]
+				try_cmd=try_cmd.split()
+				completed= subprocess.run(try_cmd)
+#control			print("Result for command {} : {} ".format(cmd[value], completed.returncode))
+			except subprocess.CalledProcessError as err:
+				sys.exit("Error using command : ", err)
+		return(completed)
+	else:
+		print("Command use requires a list of command or a single command")
+
+
+
+
+### Function reading the yaml file and extracting the data ####
+
+def import_yaml_file(file):
+	if isinstance(file, str):
+		print("Starting Import yaml")
+		try:
+			with open(file) as read_file:
+				data = yaml.load(read_file, Loader=yaml.FullLoader)
+#control				print("Data read are : {}".format(data))
+				return(data)
+		except Exception as err :
+			print("Could not open {} file error : {}".format(file,err))
+	else:
+		sys.exit("Could not import yaml file : {} is not a valid file or path".format(file))
+
+
+
+####################################################
+#              MAIN PROGRAM                        #
+####################################################
+
+### Check for a second argument before anything ###
+if len(sys.argv) != 2 :
+	raise ValueError("Please provide path to yaml file as argument, usage : {} path ".format(sys.argv[0]))
+
+
+
+### STEP 1 : Import YAML file content into yaml_data variable ###
+
+yaml_data=import_yaml_file(sys.argv[1])
+print("STEP 1 : YAML data imported")
+
+#control print(yaml_data)
+
+### STEP 2 : Creating Error handlers ###
+log_path=yaml_data.get('logging')
+magento_logger=logging.getLogger()
+magento_logger.setLevel(logging.DEBUG)
+magento_formatter = logging.Formatter(' %(asctime)s :: %(levelname)s ::  %(message)s')
+magento_file_handler= RotatingFileHandler(log_path, 'a', 100000, 1)
+magento_file_handler.setLevel(logging.DEBUG)
+magento_file_handler.setFormatter(magento_formatter)
+magento_logger.addHandler(magento_file_handler)
+magento_logger.info("STEP 1 : Starting script \t STEP 2 : Error handler loaded")
+
+if os.path.exists("/tmp/.magento_init") == True:
+	magento_logger.error("Previous installation not finished, exiting setup")
+	sys.exit("Error while processing setup, previous setup did not end successfuly")
+
+subprocess.run(['touch','/tmp/.magento_init'])
+
+### STEP 3 : Retrieve package list in YAML file and call the main package management process ###
+
+package_list=yaml_data.get('packages')
+#control print(package_list)
+install_package(package_list)
+print("STEP 3 : Packages are installed")
+magento_logger.info("STEP 3 : packages are installed, list : {}".format(package_list))
+
+
+
+### STEP 4 : Getting database configuration from YAML       ###
+### Test if database exists, if empty it calls the module ###
+### Database aliased as mariadb  and execute the queries     ###
+
+db_info=yaml_data.get('database').get('database')
+#print(db_info)
+query=yaml_data.get('database').get('query')
+
+maria_result=mariadb._check_db(db_info)
+#control print("maria result is ",maria_result)
+#Maria result will be False if database exists, will return True if 
+#the database did not exist or could not connect with the parameters given
+#script will go on in this case
+if maria_result == True:
+	mariadb._query_list_sock(db_info,query)
+	print("STEP 4 : Database configuration done")
+	magento_logger.info("STEP 4 : Database configuration done. DB {}".format(db_info)) 
+else:
+	magento_logger.error("STEP 4 : Database configuration was not done")
+	sys.exit("STEP 4 : Database configuration was not done")
+
+
+
+### STEP 5 : Installing elastic search ###
+
+elastic_cmd=yaml_data.get('commands').get('elasticsearch')
+command_use(elastic_cmd)
+print("STEP 5 : Elastic search installed")
+magento_logger.info("STEP 5 : elasticsearch installed")
+
+### STEP 6 : Creating SSL Cert for Apache ###
+
+ssl_cmd=yaml_data.get('commands').get('ssl')
+#control print(ssl_cmd)
+command_use(ssl_cmd)
+print("STEP 6 : SSL for apache installed")
+magento_logger.info("STEP 6 : SSL for apache installed")
+
+### STEP 7 : install magento (copy from git, composer install and run setup)
+
+magento_inst=yaml_data.get('commands').get('magento_inst_git')
+command_use(magento_inst)
+print("STEP 7 : Magento installed from github")
+magento_logger.info("STEP 7 : Magento copied from git")
+
+### STEP 8 : Editing conf files ###
+if os.path.exists("/tmp/.magento_flag") == True:
+	magento_logger.error("Previous files configuration did not end, exiting")
+	sys.exit("Previous files configuration did not end, exiting")
+
+else:
+	subprocess.run(['touch','/tmp/.magento_flag'])
+	conf_files=yaml_data.get('files')
+	for mod_file in conf_files.keys():
+		try:
+			file_arg=conf_files[mod_file].get('file')
+			string_arg=conf_files[mod_file].get('string')
+			new_string_arg=conf_files[mod_file].get('new_string')
+			magento_logger.info("modifying file {}".format(file_arg))
+			files._replace_string(file_arg,string_arg,new_string_arg)
+		except:
+			sys.exit("Conf files modifications failed, STEP 8")
+			magento_logger.error("STEP 8 : configuration files modification failed")
+	print("STEP 8 : configuration files modified")
+	subprocess.run(['rm','/tmp/.magento_flag'])
+	magento_logger.info("STEP 8 Configuration files modified, flag removed")
+
+
+### STEP 9 : Activate apachemodules and restart apache  ###
+
+modules_apache=yaml_data.get('commands').get('apache2_mods')
+command_use(modules_apache)
+print("STEP 9 : Apache modules activated")
+magento_logger.info("STEP 9 Apache modules activated")
+
+### STEP 10 : Install magento and cron install ###
+
+magento_inst=yaml_data.get('magento_setup')
+magento_inst_command=yaml_data.get('www').get('www_path') + "/bin/./magento setup:install "
+#control print(magento_inst_command)
+for option in magento_inst:
+	magento_inst_command=magento_inst_command + str("--"+option+"="+magento_inst[option]+" ")
+#control	print(magento_inst_command)
+try:
+	inst=subprocess.run(magento_inst_command.split())
+	magento_logger.info("Magento install command: {}".format(magento_inst_command))
+	inst_cron_command=yaml_data.get('www').get('www_path') + "/bin/./magento cron:install"
+	magento_logger.info("magento cron install command : {}".format(inst_cron_command))
+	inst_cron=subprocess.run(inst_cron_command.split())
+
+except:
+	sys.exit("STEP 10 : could not install magento")
+	magento_logger.error("STEP 10 could not run setup:install for magento with {} command".format(magento_inst))
+print("STEP 10 : magento installed and cron created")
+magento_logger.info("STEP 10 setup:install for magento finished")
+
+
+### STEP 11 : Configure ACL for www folder and final restart apache ###
+
+apache_end=yaml_data.get('commands').get('apache2_end')
+www_path=yaml_data.get('www')['www_path']
+www_user=yaml_data.get('www')['www_user']
+www_group=yaml_data.get('www')['www_group']
+www_url=yaml_data.get('magento_setup')['base-url-secure']
+command_use(apache_end)
+
+try:
+	recurchown._recur_chown(www_path,www_user, www_group,True)
+	subprocess.run(['wget','-P','/tmp/','--no-check-certificate',www_url])
+	magento_logger.info("Connected with succes to website")
+except:
+	magento_logger("STEP 11, couldn't open website for first connexion")
+	sys.exit("STEP 11, couldn't open website for first connexion")
+
+if recurchown._recur_chown(www_path,www_user, www_group,True)==True:
+	print("STEP 11 : Apache restarted and files permission placed")
+	magento_logger.info("STEP 11 apache restarted and file permission for website folder modified")
+else:
+	magento_logger.error("STEP 11 www folder permission could not be modified")
+	sys.exit("Print STEP 11 failed, acl couldn't not be modified")
+
+### STEP 12 : Show admin URL and remove init file ###
+
+
+magento_url_cmd=yaml_data.get('www').get('www_path') + "/bin/./magento info:adminuri"
+try:
+	magento_url=subprocess.run(magento_url_cmd.split(),capture_output=True)
+	printurl=str(magento_url.stdout)[4:28]
+#control print(printurl)
+	print("STEP 11 : magento installed and working :\n ###### \n \n # {} # \n\n #####".format(printurl))
+	magento_logger.info("STEP 12 Admin URL is : {}".format(printurl))
+	subprocess.run(['rm', '/tmp/.magento_init'])
+	magento_logger.info("Init deleted")
+except:
+	print("Could not retrieve admin URL")
+	magento_logger.info("STEP 12, could not retrieve admin url")
+
+
+
+
+print("#####################################\n###### {} IS FINISHED ###### \n ".format(sys.argv[0]))
+magento_logger.info("End of script")

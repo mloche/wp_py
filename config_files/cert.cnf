@@ -1,0 +1,10 @@
+[req]
+distinguished_name = Local.net
+prompt = no
+[Local.net]
+C = FR
+ST = Auvergne
+L = Clermont-Ferrand
+O = Local.net
+OU = IT
+CN = Common Name

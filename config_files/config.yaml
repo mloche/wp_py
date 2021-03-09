@@ -1,0 +1,125 @@
+#path to the log file
+logging: "/var/log/magento_py.log"
+
+#list of webserver variables, folder and user/group
+www:
+ www_path: "/var/www/html/magento2"
+ www_user: "www-data"
+ www_group: "www-data"
+
+#List of the database params
+database:
+ database:   #variables to connect the DB
+  ip_address: localhost
+  db_admin: magento
+  db_password: magento
+  db_name: magento
+  db_port: 3306
+  unix_sock: "/var/run/mysqld/mysqld.sock"
+ query:  #queries to configure and create the DB
+  - "create database magento;"
+  - "create user 'magento'@'localhost' identified by 'magento';"
+  - "grant all on magento.* to 'magento'@'localhost' identified by 'magento' with grant option;"
+  - "flush privileges;"
+
+#List of required packages case sensitive with apt package name
+packages:
+ - apache2
+ - mariadb-server
+ - php-mysql
+ - git
+ - libapache2-mod-php
+ - php-bcmath
+ - php-curl
+ - php-xml
+ - php-gd
+ - php-mbstring
+ - php-intl
+ - php-soap
+ - php-zip
+ - openjdk-11-jdk
+ - composer
+ - curl
+
+#list of commands for each component
+commands:
+ ssl:
+  - mkdir -p /etc/apache2/ssl
+  - openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/apache2/ssl/apache.key -out /etc/apache2/ssl/apache.crt --config config_files/cert.cnf
+  - chmod -R 600 /etc/apache2/ssl
+ apache2_mods:
+  - a2enmod ssl
+  - a2ensite default-ssl
+  - a2enmod rewrite
+  - a2enmod expires
+  - a2enmod headers
+  - a2enmod proxy
+  - a2enmod proxy_html
+ elasticsearch:
+  - wget -P /tmp/elasticsearch/ https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.10.0-amd64.deb
+  - wget -P /tmp/elasticsearch/ https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.10.0-amd64.deb.sha512
+  - shasum -a 512 -c /tmp/elasticsearch/elasticsearch-7.10.0-amd64.deb
+  - dpkg -i /tmp/elasticsearch/elasticsearch-7.10.0-amd64.deb
+  - systemctl start elasticsearch
+  - systemctl daemon-reload
+  - systemctl enable elasticsearch.service
+ apache2_end:
+  - chmod a-w /var/www/html/magento2/app/etc
+  - systemctl restart apache2
+ magento_inst_git:
+  - git -C /var/www/html/ clone --branch 2.4.1 https://github.com/magento/magento2
+  - sudo composer install -d /var/www/html/magento2 
+
+#list of files for modification
+files:
+ apache_ssl_cert:
+  file: "/etc/apache2/sites-available/default-ssl.conf" 
+  string: "/etc/ssl/certs/ssl-cert-snakeoil.pem"
+  new_string: "/etc/apache2/ssl/apache.crt"
+ apache_ssl_key:
+  file: "/etc/apache2/sites-available/default-ssl.conf"
+  string: "/etc/ssl/private/ssl-cert-snakeoil.key"
+  new_string: "/etc/apache2/ssl/apache.key"
+ php_tz:
+  file: "/etc/php/7.3/apache2/php.ini"
+  string: ";date.timezone ="
+  new_string: "date.timezone = Europe/Paris"
+ php_mem:
+  file: "/etc/php/7.3/apache2/php.ini"
+  string: "memory_limit = 128M"
+  new_string: "memory_limit = 4G"
+ php_op:
+  file: "/etc/php/7.3/apache2/php.ini"
+  string: ";opcache.save.comments=1"
+  new_string: "opcache.save.comments=1"
+ mariadb:  
+  file: "/etc/mysql/mariadb.conf.d/50-server.cnf"
+  string: "[server]"
+  new_string: "[server]\nexplicit_defaults_for_timestamp=1\n"
+ apache_vhost_proxy:
+  file: "/etc/apache2/sites-available/000-default.conf"
+  string: "<VirtualHost *:80>"
+  new_string: "Listen 8080\n<VirtualHost *:8080>\n\tProxyPass \"/\" \"http://localhost:9200\"\n\tProxyPassReverse \"/\" \"http://localhost:9200\"\n"
+ apache_vhost_magento:
+  file: "/etc/apache2/sites-available/default-ssl.conf"
+  string: "DocumentRoot /var/www/html"  
+  new_string: "DocumentRoot /var/www/html/magento2\n\t\t<Directory /var/www/html/magento2>\n\t\t\tAllowOverride All\n\t\t</Directory>"
+
+#List of options and values for magento install
+magento_setup:
+ admin-firstname: admin
+ admin-lastname: magento
+ language: fr_FR
+ currency: EUR
+ timezone: Europe/Paris
+ use-secure: "1"
+ base-url-secure: https://192.168.1.13
+ db-host: localhost
+ db-user: magento
+ db-password: magento
+ db-name: magento
+ use-secure-admin: "1"
+ admin-password: passw0rd
+ admin-email: admin@local.net
+ base-url: https://192.168.1.13
+ admin-user: admin
