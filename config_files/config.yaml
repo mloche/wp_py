@@ -53,15 +53,16 @@ commands:
   - chown -R  /var/www/html/wordpress
   - systemctl restart apache2
  wp_inst:
-  - wget -O /var/www/html/wordpress/wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
-  - chmod +x /var/www/html/wordpress/wp-cli.phar
-  - /var/www/html/wordpress/wp-cli.phar cli update
   - mkdir -p /var/www/html/wordpress
+  - wget -O /tmp/wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+  - chmod +x /tmp/wp-cli.phar
+  - cp /tmp/wp-cli.phar /usr/local/bin/wp
+  - wp cli update
   - chown -R www-data:www-data /var/www/html/wordpress
- # - cd /var/www/html/wordpress
-  - sudo -u www-data ./var/www/html/wordpress/wp-cli.phar core download
-  - sudo -u www-data ./var/www/html/wordpress/wp-cli.phar core config --dbname=wordpress dbuser=wordpress --dbpass=wordpress
-  - sudo -u www-data ./var/www/html/wordpress/wp-cli.phar core install --url=https://192.168.1.15 --title=WPfromscript --admin_user=admin --admin_password=admin --admin_email=admin@local.net
+#  - cd /var/www/html/wordpress
+  - sudo -u www-data wp core download cwd=/var/www/html/wordpress
+  - sudo -u www-data wp core config --dbname=wordpress dbuser=wordpress --dbpass=wordpress
+  - sudo -u www-data wp core install --url=https://192.168.1.15 --title=WPfromscript --admin_user=admin --admin_password=admin --admin_email=admin@local.net
 
 #list of files for modification
 files:
@@ -73,15 +74,7 @@ files:
   file: "/etc/apache2/sites-available/default-ssl.conf"
   string: "/etc/ssl/private/ssl-cert-snakeoil.key"
   new_string: "/etc/apache2/ssl/apache.key"
- php_tz:
-  file: "/etc/php/7.4/apache2/php.ini"
-  string: ";date.timezone ="
-  new_string: "date.timezone = Europe/Paris"
- mariadb:  
-  file: "/etc/mysql/mariadb.conf.d/50-server.cnf"
-  string: "[server]"
-  new_string: "[server]\nexplicit_defaults_for_timestamp=1\n"
- apache_vhost_magento:
+ apache_vhost_wp:
   file: "/etc/apache2/sites-available/default-ssl.conf"
   string: "DocumentRoot /var/www/html"  
   new_string: "DocumentRoot /var/www/html/wordpress\n\t\t<Directory /var/www/html/wordpress>\n\t\t\tAllowOverride All\n\t\t</Directory>"
