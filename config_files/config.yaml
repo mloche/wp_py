@@ -1,9 +1,9 @@
 #path to the log file
-logging: "/var/log/magento_py.log"
+logging: "/var/log/wp_py.log"
 
 #list of webserver variables, folder and user/group
 www:
- www_path: "/var/www/html/magento2"
+ www_path: "/var/www/html/wordpress"
  www_user: "www-data"
  www_group: "www-data"
 
@@ -11,35 +11,25 @@ www:
 database:
  database:   #variables to connect the DB
   ip_address: localhost
-  db_admin: magento
-  db_password: magento
-  db_name: magento
+  db_admin: wordpress
+  db_password: wordpress
+  db_name: wordpress
   db_port: 3306
   unix_sock: "/var/run/mysqld/mysqld.sock"
  query:  #queries to configure and create the DB
-  - "create database magento;"
-  - "create user 'magento'@'localhost' identified by 'magento';"
-  - "grant all on magento.* to 'magento'@'localhost' identified by 'magento' with grant option;"
+  - "create database wordpress;"
+  - "create user 'wordpress'@'localhost' identified by 'wordpress';"
+  - "grant all on magento.* to 'wordpress'@'localhost' identified by 'wordpress' with grant option;"
   - "flush privileges;"
 
 #List of required packages case sensitive with apt package name
 packages:
  - apache2
  - mariadb-server
- - php-mysql
- - git
- - libapache2-mod-php
- - php-bcmath
- - php-curl
- - php-xml
- - php-gd
- - php-mbstring
- - php-intl
- - php-soap
- - php-zip
- - openjdk-11-jdk
- - composer
- - curl
+ - gnupg
+ - lsb-release
+ - apt-transport-https
+ - ca-certificates
 
 #list of commands for each component
 commands:
@@ -55,20 +45,23 @@ commands:
   - a2enmod headers
   - a2enmod proxy
   - a2enmod proxy_html
- elasticsearch:
-  - wget -P /tmp/elasticsearch/ https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.10.0-amd64.deb
-  - wget -P /tmp/elasticsearch/ https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.10.0-amd64.deb.sha512
-  - shasum -a 512 -c /tmp/elasticsearch/elasticsearch-7.10.0-amd64.deb
-  - dpkg -i /tmp/elasticsearch/elasticsearch-7.10.0-amd64.deb
-  - systemctl start elasticsearch
-  - systemctl daemon-reload
-  - systemctl enable elasticsearch.service
+ php74:
+  - wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
+  - echo "deb https://packages.sury.org/php $(lsb_release -sc) main" | suto tee /etc/apt/sources.list.d/php.list
+  - apt update
  apache2_end:
-  - chmod a-w /var/www/html/magento2/app/etc
+  - chown -R  /var/www/html/wordpress
   - systemctl restart apache2
- magento_inst_git:
-  - git -C /var/www/html/ clone --branch 2.4.1 https://github.com/magento/magento2
-  - sudo composer install -d /var/www/html/magento2 
+ wp_inst:
+  - wget -O /var/www/html/wordpress/wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+  - chmod +x /var/www/html/wordpress/wp-cli.phar
+  - /var/www/html/wordpress/wp-cli.phar cli update
+  - mkdir -p /var/www/html/wordpress
+  - chown -R www-data:www-data /var/www/html/wordpress
+ # - cd /var/www/html/wordpress
+  - sudo -u www-data ./var/www/html/wordpress/wp-cli.phar core download
+  - sudo -u www-data ./var/www/html/wordpress/wp-cli.phar core config --dbname=wordpress dbuser=wordpress --dbpass=wordpress
+  - sudo -u www-data ./var/www/html/wordpress/wp-cli.phar core install --url=https://192.168.1.15 --title=WPfromscript --admin_user=admin --admin_password=admin --admin_email=admin@local.net
 
 #list of files for modification
 files:
@@ -81,29 +74,17 @@ files:
   string: "/etc/ssl/private/ssl-cert-snakeoil.key"
   new_string: "/etc/apache2/ssl/apache.key"
  php_tz:
-  file: "/etc/php/7.3/apache2/php.ini"
+  file: "/etc/php/7.4/apache2/php.ini"
   string: ";date.timezone ="
   new_string: "date.timezone = Europe/Paris"
- php_mem:
-  file: "/etc/php/7.3/apache2/php.ini"
-  string: "memory_limit = 128M"
-  new_string: "memory_limit = 4G"
- php_op:
-  file: "/etc/php/7.3/apache2/php.ini"
-  string: ";opcache.save.comments=1"
-  new_string: "opcache.save.comments=1"
  mariadb:  
   file: "/etc/mysql/mariadb.conf.d/50-server.cnf"
   string: "[server]"
   new_string: "[server]\nexplicit_defaults_for_timestamp=1\n"
- apache_vhost_proxy:
-  file: "/etc/apache2/sites-available/000-default.conf"
-  string: "<VirtualHost *:80>"
-  new_string: "Listen 8080\n<VirtualHost *:8080>\n\tProxyPass \"/\" \"http://localhost:9200\"\n\tProxyPassReverse \"/\" \"http://localhost:9200\"\n"
  apache_vhost_magento:
   file: "/etc/apache2/sites-available/default-ssl.conf"
   string: "DocumentRoot /var/www/html"  
-  new_string: "DocumentRoot /var/www/html/magento2\n\t\t<Directory /var/www/html/magento2>\n\t\t\tAllowOverride All\n\t\t</Directory>"
+  new_string: "DocumentRoot /var/www/html/wordpress\n\t\t<Directory /var/www/html/wordpress>\n\t\t\tAllowOverride All\n\t\t</Directory>"
 
 #List of options and values for magento install
 magento_setup:
