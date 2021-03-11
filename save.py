@@ -1,14 +1,11 @@
-#mysqldump --user=wordpres --password=password --databases wordpress > /tmp/wp.dump
-#mysql -u wordpress --password=password < /tmp/wp.dump
-
 #!/bin/python3
 ### Imports required module including custom modules in the ./modules/ folder ###
 
 #Standard modules#
-#import apt
+import apt
 import sys
 sys.path.append('./modules/')
-#import yaml
+import yaml
 import os
 import shutil
 import subprocess
@@ -16,13 +13,30 @@ import fileinput
 import logging
 from logging.handlers import RotatingFileHandler
 #Custom modules#
-#import database as mariadb
+import database as mariadb
 import files
 import recurchown
 
+#mysqldump --user=wordpres --password=password --databases wordpress > /tmp/wp.dump
+#mysql -u wordpress --password=password < /tmp/wp.dump
+
+
+
 ### FUNCTIONS DEFINITION ###
-def restore(file):
-    print("Restore {}".format(file))
+def restore(type,date):
+	if isinstance(type,str):
+		if type.lower() == "wp": 
+    			print("Restore WP for {} date".format(date))
+		elif type.lower() == "full":
+			print("Restore FULL for {} date".format(date))
+		else:
+			raise ValueError("Invalid type of restore asked, wp or full")
+	else :
+		raise ValueError("Invalid type of arguments, please provide string WP or full")
+
+
+
+
 
 def backup():
     print("Backup")
@@ -32,20 +46,30 @@ def backup():
 
 print("#####################################\n###### {} IS STARTING ###### \n ".format(sys.argv[0]))
 
-if len(sys.argv) != 3 and sys.argv[1] == "restore":
-    raise ValueError("You must provide saved archive file, usage {} restore file".format(sys.argv[0]))
+
+if len(sys.argv) < 2:
+	raise ValueError("Invalid usage or path, usage is script backup/restore type date")
 
 if len(sys.argv) == 2 and sys.argv[1] != "backup":
     raise ValueError("Invalid usage, usage {} backup".format(sys.argv[0]))
 
+if len(sys.argv) != 4 and sys.argv[1] == "restore":
+    raise ValueError("You must provide saved archive date, usage {} restore full/WP date".format(sys.argv[0]))
+
+
 if sys.argv[1] == "backup" and len(sys.argv) == 2:
     backup()
 
-elif sys.argv[1] == "restore" and len(sys.argv) == 3:
-    restore(sys.argv[2])
-
+elif sys.argv[1] == "restore" and len(sys.argv) == 4:
+    restore(sys.argv[2],sys.argv[3])
 else:
-    sys.exit("Invalid usage or path, usage is script backup/restore file")
+	sys.exit("error in args given")
+
+print("#####################################\n###### {} IS FINISHED ###### \n ".format(sys.argv[0]))
+
+
+
+
 
 """    
 prendre la sauvegarde comme variable
