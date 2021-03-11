@@ -186,6 +186,7 @@ wp_inst=yaml_data.get('commands').get('wp_inst')
 command_use(wp_inst)
 print("STEP 8 : Wordpress installed")
 wp_logger.info("STEP 8 : Wordpress installed")
+install_dir=""
 
 ### STEP 9 : Editing conf files ###
 if os.path.exists("/tmp/.wp_flag") == True:
@@ -245,7 +246,10 @@ apache_end=yaml_data.get('commands').get('apache2_end')
 www_path=yaml_data.get('www')['www_path']
 www_user=yaml_data.get('www')['www_user']
 www_group=yaml_data.get('www')['www_group']
+os.chdir(www_path)
+wp_inst_end=yaml_data.get('commands').get('wp_inst_cli')
 #www_url=yaml_data.get('magento_setup')['base-url-secure']
+command_use(wp_inst_end)
 command_use(apache_end)
 """
 try:

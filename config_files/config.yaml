@@ -50,7 +50,7 @@ commands:
   - echo "deb https://packages.sury.org/php $(lsb_release -sc) main" | suto tee /etc/apt/sources.list.d/php.list
   - apt update
  apache2_end:
-  - chown -R  /var/www/html/wordpress
+  - chown -R www-data:www-data /var/www/html/wordpress
   - systemctl restart apache2
  wp_inst:
   - mkdir -p /var/www/html/wordpress
@@ -60,9 +60,10 @@ commands:
   - wp cli update
   - chown -R www-data:www-data /var/www/html/wordpress
 #  - cd /var/www/html/wordpress
-  - sudo -u www-data wp core download cwd=/var/www/html/wordpress
+ wp_inst_cli:
+  - sudo -u www-data wp core download
   - sudo -u www-data wp core config --dbname=wordpress dbuser=wordpress --dbpass=wordpress
-  - sudo -u www-data wp core install --url=https://192.168.1.15 --title=WPfromscript --admin_user=admin --admin_password=admin --admin_email=admin@local.net
+  - sudo -u www-data wp core install --url=https://localhost --title=WPfromscript --admin_user=admin --admin_password=admin --admin_email=admin@local.net
 
 #list of files for modification
 files:
