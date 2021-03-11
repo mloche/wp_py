@@ -3,6 +3,7 @@
 
 #Standard modules#
 import apt
+import datetime
 import sys
 sys.path.append('./modules/')
 import yaml
@@ -23,12 +24,12 @@ import recurchown
 
 
 ### FUNCTIONS DEFINITION ###
-def restore(type,date):
-	if isinstance(type,str):
-		if type.lower() == "wp": 
-    			print("Restore WP for {} date".format(date))
+def restore(type,savedate):
+	if isinstance(type,str) and isinstance(savedate,datetime.date):
+		if type.lower() == "wp":
+			print("Restore WP for {} date".format(savedate))
 		elif type.lower() == "full":
-			print("Restore FULL for {} date".format(date))
+			print("Restore FULL for {} date".format(savedate))
 		else:
 			raise ValueError("Invalid type of restore asked, wp or full")
 	else :
@@ -51,17 +52,19 @@ if len(sys.argv) < 2:
 	raise ValueError("Invalid usage or path, usage is script backup/restore type date")
 
 if len(sys.argv) == 2 and sys.argv[1] != "backup":
-    raise ValueError("Invalid usage, usage {} backup".format(sys.argv[0]))
+	raise ValueError("Invalid usage, usage {} backup".format(sys.argv[0]))
 
 if len(sys.argv) != 4 and sys.argv[1] == "restore":
-    raise ValueError("You must provide saved archive date, usage {} restore full/WP date".format(sys.argv[0]))
+	raise ValueError("You must provide saved archive date, usage {} restore full/WP date".format(sys.argv[0]))
 
 
 if sys.argv[1] == "backup" and len(sys.argv) == 2:
-    backup()
+	backup()
 
 elif sys.argv[1] == "restore" and len(sys.argv) == 4:
-    restore(sys.argv[2],sys.argv[3])
+	savedate=datetime.datetime.strptime(sys.argv[3],'%Y-%m-%d')
+#	print(savedate,type(savedate))
+	restore(sys.argv[2],savedate)
 else:
 	sys.exit("error in args given")
 
