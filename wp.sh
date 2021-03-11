@@ -11,6 +11,7 @@ mv /tmp/wp-cli.phar /usr/local/bin/wp
 wp cli update
 mysql < wp.sql
 chown -R www-data:www-data /var/www/html
+mv /var/www/html/index.html /var/www/html/index.html.old
 cd /var/www/html
 sudo -u www-data wp core download
 sudo -u www-data wp core config --dbname=wordpress --dbuser=wordpress --dbpass=wordpress
