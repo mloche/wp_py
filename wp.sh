@@ -9,6 +9,7 @@ wget -O /tmp/wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-page
 chmod +x /tmp/wp-cli.phar
 mv /tmp/wp-cli.phar /usr/local/bin/wp
 wp cli update
+mysql < wp.sql
 chown -R www-data:www-data /var/www/html
 cd /var/www/html
 sudo -u www-data wp core download
