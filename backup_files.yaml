@@ -3,20 +3,21 @@ logging: "/var/log/backup.log"
 #folder needs to be given for folder option
 #folder and key file will be required for aws option
 backup_method: aWs
-backup_folder: /mnt/s3-saves
+backup_folder: /folder
 aws:
- key: config_files/key
+ key: ../key.txt
  bucket: localdotnet
+ mounting: /mnt/s3-saves
 files:
- websrv_files:
-  /etc/apache2/apache2.conf
- vhost_files:
-  /etc/apache2/site-available/wp.conf
- my:
-  /etc/mysql/my.cnf
- php:
-  /etc/php/7.4/apache2/php.ini
- wp:
+# websrv_files:
+ - /etc/apache2/apache2.conf
+# vhost_files:
+ - /etc/apache2/site-available/wp.conf
+# my:
+ - /etc/mysql/my.cnf
+# php:
+ - /etc/php/7.4/apache2/php.ini
+wp_folder:
   /var/www/html
 websrv_cmdfull:
  a2ensite wp.conf

@@ -38,7 +38,9 @@ def restore(type,savedate):
 
 def files_copy(folder,file):
 	print("copying {} to {}".format(file,folder))
-
+	save_file=folder+"/backups/file"
+	for line in file:
+		subprocess.run(['echo',line,'>>',save_file])
 
 def backup(yaml_data):
 #	print("data received for backup",yaml_data)
@@ -49,7 +51,7 @@ def backup(yaml_data):
 		sys.exit("Backup method was not configured, exiting")
 
 	elif method.lower() == "aws":
-		backup_folder = yaml_data.get('backup_folder')
+		backup_folder = yaml_data.get('aws').get('mounting')
 		s3key=yaml_data.get('aws').get('key')
 		bucket_name=yaml_data.get('aws').get('bucket')
 		print("backup AWS in folder ",backup_folder, "with key", s3key, "in bucket", bucket_name)
@@ -58,6 +60,8 @@ def backup(yaml_data):
 		subprocess.run(['s3fs',bucket_name,backup_folder,'-o',keyarg])
 		aws_files=yaml_data.get('files')
 		files_copy(backup_folder,aws_files)
+		#unmount folder
+#		subprocess.run(['umount',backup_folder])
 	elif method.lower() == "folder":
 		backup_folder = yaml_data.get('backup_folder')
 		print("Backup folder ", backup_folder)
