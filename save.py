@@ -36,11 +36,35 @@ def restore(type,savedate):
 		raise ValueError("Invalid type of arguments, please provide string WP or full")
 
 
+def files_copy(folder,file):
+	print("copying {} to {}".format(file,folder))
 
 
+def backup(yaml_data):
+#	print("data received for backup",yaml_data)
+	method=yaml_data.get('backup_method')
+#	print(method)
+	if method == None:
+		backup_logger.info("Backup method was not configured")
+		sys.exit("Backup method was not configured, exiting")
 
-def backup():
-    print("Backup")
+	elif method.lower() == "aws":
+		backup_folder = yaml_data.get('backup_folder')
+		s3key=yaml_data.get('aws').get('key')
+		bucket_name=yaml_data.get('aws').get('bucket')
+		print("backup AWS in folder ",backup_folder, "with key", s3key, "in bucket", bucket_name)
+		#mount folder
+		keyarg="passwd_file=" + s3key
+		subprocess.run(['s3fs',bucket_name,backup_folder,'-o',keyarg])
+		aws_files=yaml_data.get('files')
+		files_copy(backup_folder,aws_files)
+	elif method.lower() == "folder":
+		backup_folder = yaml_data.get('backup_folder')
+		print("Backup folder ", backup_folder)
+	elif method.lower() == "scp":
+		print("backup using scp")
+
+
 
 def import_yaml(file):
 	if isinstance(file,str):
@@ -59,33 +83,42 @@ def import_yaml(file):
 
 print("#####################################\n###### {} IS STARTING ###### \n ".format(sys.argv[0]))
 
+yaml_data=import_yaml("backup_files.yaml")
+#print(yaml_data)
+
+### CREATING ERROR HANDLERS ###
+log_path=yaml_data.get('logging')
+backup_logger=logging.getLogger()
+backup_logger.setLevel(logging.DEBUG)
+backup_formatter = logging.Formatter('%(asctime)s :: %(levelname)s :: %(message)s')
+backup_file_handler=RotatingFileHandler(log_path, 'a', 100000,1)
+backup_file_handler.setLevel(logging.DEBUG)
+backup_file_handler.setFormatter(backup_formatter)
+backup_logger.addHandler(backup_file_handler)
+backup_logger.info("Error handler loaded")
+
 
 if len(sys.argv) < 2:
-	raise ValueError("Invalid usage or path, usage is script backup/restore type date")
+	backup_logger.info("invalid usage not enough arguments")
+	raise ValueError("Invalid usage, usage is script backup/restore type date")
 
 if len(sys.argv) == 2 and sys.argv[1] != "backup":
+	backup_logger.info("Invalid usage for backup")
 	raise ValueError("Invalid usage, usage {} backup".format(sys.argv[0]))
 
 if len(sys.argv) != 4 and sys.argv[1] == "restore":
+	backup_logger.info("Invalid usage for restore")
 	raise ValueError("You must provide saved archive date, usage {} restore full/WP date".format(sys.argv[0]))
 
 
 if sys.argv[1] == "backup" and len(sys.argv) == 2:
-	backup()
+	backup(yaml_data)
 
 elif sys.argv[1] == "restore" and len(sys.argv) == 4:
 	savedate=datetime.datetime.strptime(sys.argv[3],'%Y-%m-%d')
 	restore(sys.argv[2],savedate)
 else:
 	sys.exit("error in args given")
-
-yaml_data=import_yaml("backup_files.yaml")
-print(yaml_data)
-
-### CREATING ERROR HANDLERS ###
-log_path=yaml_data.get('logging')
-backup_logger=logging.getLogger()
-backup_logger.setLevel(logging.DEBUG)
 
 
 print("#####################################\n###### {} IS FINISHED ###### \n ".format(sys.argv[0]))
