@@ -42,6 +42,18 @@ def restore(type,savedate):
 def backup():
     print("Backup")
 
+def import_yaml(file):
+	if isinstance(file,str):
+		print("Importing YAML")
+		try:
+			with open(file) as read_file:
+				data = yaml.load(read_file, Loader=yaml.FullLoader)
+				return(data)
+		except Exception as err:
+			print("Could not open {}, file error {}".format(file,err))
+	else:
+		sys.exit("Could not import yaml file : {} is not a valid file or path".format(file))
+
 
 
 
@@ -63,10 +75,18 @@ if sys.argv[1] == "backup" and len(sys.argv) == 2:
 
 elif sys.argv[1] == "restore" and len(sys.argv) == 4:
 	savedate=datetime.datetime.strptime(sys.argv[3],'%Y-%m-%d')
-#	print(savedate,type(savedate))
 	restore(sys.argv[2],savedate)
 else:
 	sys.exit("error in args given")
+
+yaml_data=import_yaml("backup_files.yaml")
+print(yaml_data)
+
+### CREATING ERROR HANDLERS ###
+log_path=yaml_data.get('logging')
+backup_logger=logging.getLogger()
+backup_logger.setLevel(logging.DEBUG)
+
 
 print("#####################################\n###### {} IS FINISHED ###### \n ".format(sys.argv[0]))
 
