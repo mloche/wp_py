@@ -39,8 +39,18 @@ def restore(type,savedate):
 def files_copy(folder,file):
 	print("copying {} to {}".format(file,folder))
 	save_file=folder+"/backups/file"
+	temp_file="/tmp/save"
 	for line in file:
-		subprocess.run(['echo',line,'>>',save_file])
+		print(line)
+#		files._insert_top(temp_file,line)
+#	subprocess.run(['mv',temp_file,save_file])
+
+def sql_dump(dump_folder):
+	try:
+		dumpcmd='mysqldump'+' --host=localhost' +' --user=wordpress' + ' --password=wordpress'+' --databases'+' wordpress'+' --result-file=/tmp/dump.sql'
+		subprocess.run(dumpcmd.split())
+	except:
+		sys.exit("sqldump failed")
 
 def backup(yaml_data):
 #	print("data received for backup",yaml_data)
@@ -57,11 +67,15 @@ def backup(yaml_data):
 		print("backup AWS in folder ",backup_folder, "with key", s3key, "in bucket", bucket_name)
 		#mount folder
 		keyarg="passwd_file=" + s3key
-		subprocess.run(['s3fs',bucket_name,backup_folder,'-o',keyarg])
+		try:
+			subprocess.run(['s3fs',bucket_name,backup_folder,'-o',keyarg])
+		except:
+			sys.exit("mount failed")
 		aws_files=yaml_data.get('files')
 		files_copy(backup_folder,aws_files)
+		sql_dump(backup_folder)
 		#unmount folder
-#		subprocess.run(['umount',backup_folder])
+		subprocess.run(['umount',backup_folder])
 	elif method.lower() == "folder":
 		backup_folder = yaml_data.get('backup_folder')
 		print("Backup folder ", backup_folder)

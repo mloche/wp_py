@@ -35,3 +35,9 @@ cd /var/www/site/
 sudo -u www-data wp core download
 sudo -u www-data wp core config --dbname=wordpress --dbuser=wordpress --dbpass=wordpress
 sudo -u www-data wp core install --url=http --title=Titletext --admin_user=admin  --admin_password=password --admin_email=email
+
+
+
+awscli
+create ./aws/credentials
+
