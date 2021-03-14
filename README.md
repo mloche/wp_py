@@ -25,6 +25,8 @@ Or you can install manually the following packages and modules :
  - git package
  - python modules PyYAML and PyMySQL
 
+If using the aws s3 service for backups, user will have to create aws secret key file in "~/.aws/credentials"
+
 
 #  USAGE  
 

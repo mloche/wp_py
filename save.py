@@ -35,6 +35,17 @@ def restore(type,savedate):
 	else :
 		raise ValueError("Invalid type of arguments, please provide string WP or full")
 
+def aws_save(yaml_data):
+	backup_folder = yaml_data.get('backup_folder')
+	bucket_name=yaml_data.get('aws').get('bucket')
+	print("backup AWS in folder ",backup_folder, "in bucket", bucket_name)
+	aws_files=yaml_data.get('files')
+	files_copy(backup_folder,aws_files)
+	sql_dump(backup_folder)
+
+
+
+
 
 def files_copy(folder,file):
 	print("copying {} to {}".format(file,folder))
@@ -42,8 +53,8 @@ def files_copy(folder,file):
 	temp_file="/tmp/save"
 	for line in file:
 		print(line)
-#		files._insert_top(temp_file,line)
-#	subprocess.run(['mv',temp_file,save_file])
+		files._insert_top(temp_file,line)
+	subprocess.run(['aws','s3','cp',temp_file,'s3://localdotnet/backups/'])
 
 def sql_dump(dump_folder):
 	try:
@@ -61,21 +72,23 @@ def backup(yaml_data):
 		sys.exit("Backup method was not configured, exiting")
 
 	elif method.lower() == "aws":
-		backup_folder = yaml_data.get('aws').get('mounting')
-		s3key=yaml_data.get('aws').get('key')
-		bucket_name=yaml_data.get('aws').get('bucket')
-		print("backup AWS in folder ",backup_folder, "with key", s3key, "in bucket", bucket_name)
-		#mount folder
-		keyarg="passwd_file=" + s3key
-		try:
-			subprocess.run(['s3fs',bucket_name,backup_folder,'-o',keyarg])
-		except:
-			sys.exit("mount failed")
-		aws_files=yaml_data.get('files')
-		files_copy(backup_folder,aws_files)
-		sql_dump(backup_folder)
-		#unmount folder
-		subprocess.run(['umount',backup_folder])
+		#installing aws cli
+		if os.path.exists(yaml_data.get('aws').get('lockfile')) == True:
+			aws_save(yaml_data)
+		else:
+			cwd=os.getcwd()
+			print("Installing aws cli")
+			subprocess.run(['wget','https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip','-O', '/tmp/awscli.zip'])
+			os.chdir("/tmp")
+			subprocess.run(['unzip','awscli.zip'])
+			subprocess.run(['rm','awscli.zip'])
+			os.chdir("/tmp/aws")
+#			print(os.getcwd())
+			subprocess.run('./install')
+			os.chdir(cwd)
+			subprocess.run(['rm','-R','/tmp/aws'])
+#			print(os.getcwd())
+			aws_save(yaml_data)
 	elif method.lower() == "folder":
 		backup_folder = yaml_data.get('backup_folder')
 		print("Backup folder ", backup_folder)

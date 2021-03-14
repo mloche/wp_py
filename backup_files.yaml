@@ -3,11 +3,10 @@ logging: "/var/log/backup.log"
 #folder needs to be given for folder option
 #folder and key file will be required for aws option
 backup_method: aws
-backup_folder: /backups
+backup_folder: /tmp/backups
 aws:
- key: ../key.txt
  bucket: localdotnet
- mounting: /mnt/s3-saves
+ lockfile: /tmp/.cliinstalled
 files:
 # websrv_files:
  - /etc/apache2/apache2.conf
