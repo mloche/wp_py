@@ -9,11 +9,13 @@ sys.path.append('./modules/')
 import yaml
 import os
 import shutil
-import stats
+import stat
+import boto3
 import subprocess
 import fileinput
 import logging
 from logging.handlers import RotatingFileHandler
+import zlib
 #Custom modules#
 import database as mariadb
 import files
@@ -36,11 +38,17 @@ def restore(type,savedate):
 	else :
 		raise ValueError("Invalid type of arguments, please provide string WP or full")
 
-def aws_save(yaml_data):
+def aws_upload(saved_file,yaml_data):
+	s3= boto3.resource('s3')
 	backup_folder = yaml_data.get('backup_folder')
 	bucket_name=yaml_data.get('aws').get('bucket')
 	print("backup AWS in folder ",backup_folder, "in bucket", bucket_name)
+	s3.Bucket(bucket_name).put_object(saved_file)
 
+
+
+
+#Function from Stackoverflow, will copy folder even if target folder does exist
 
 def copytree(src, dst, symlinks = False, ignore = None):
 	if not os.path.exists(dst):
@@ -68,14 +76,13 @@ def copytree(src, dst, symlinks = False, ignore = None):
 		else:
 			shutil.copy2(s, d)
 
-
+#end
 
 
 def files_copy(backup_folder,file_list):
 	print("copying {} to {}".format(file_list,backup_folder))
 	for file in file_list:
-		print(file)
-#		subprocess.run(['cp',file,backup_folder])
+#		print(file)
 		shutil.copy(file,backup_folder)
 
 def folders_copy(backup_folder,folder_list):
@@ -83,9 +90,16 @@ def folders_copy(backup_folder,folder_list):
 #	print(folder_list,type(folder_list))
 	for folder in folder_list:
 		target_folder=backup_folder+folder
-		print(target_folder)
-		shutil.copytree(folder,backup_folder, exist_ok=True)
+		copytree(folder,target_folder)
 
+def archive_folder(backup_folder):
+	archive_name=datetime.date.today().strftime("%Y-%m-%d")
+	os.chdir("/tmp/")
+	base_archive_dir="base_dir="+backup_folder
+	print(archive_name,backup_folder)
+	shutil.make_archive(archive_name,'gztar',backup_folder)
+	saved_file=archive_name+"tar.gz"
+	return(saved_file)
 
 def sql_dump(dump_folder):
 	try:
@@ -117,6 +131,10 @@ def backup(yaml_data):
 			sql_dump(backup_folder)
 			folder_list=yaml_data.get('folders')
 			folders_copy(backup_folder,folder_list)
+			saved_file=archive_folder(backup_folder)
+			#move archive to s3
+			shutil.rmtree(backup_folder)
+			aws_upload(saved_file)
 		else:
 			cwd=os.getcwd()
 			print("Installing aws cli")
