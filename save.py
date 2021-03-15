@@ -39,12 +39,31 @@ def restore(type,savedate):
 		raise ValueError("Invalid type of arguments, please provide string WP or full")
 
 def aws_upload(saved_file,yaml_data):
+	cwd=os.getcwd()
+	os.chdir("/tmp/")
+	file_path="/tmp/"+saved_file
 	s3= boto3.resource('s3')
-	backup_folder = yaml_data.get('backup_folder')
+#	backup_folder = yaml_data.get('backup_folder')
 	bucket_name=yaml_data.get('aws').get('bucket')
-	print("backup AWS in folder ",backup_folder, "in bucket", bucket_name)
-	s3.Bucket(bucket_name).put_object(saved_file)
+	print("backup AWS ! file ",file_path, "in bucket", bucket_name)
+	try:
 
+		s3.Bucket(bucket_name).upload_file(file_path,saved_file)
+		os.chdir(cwd)
+	except:
+		sys.exit("s3 uplad failed")
+
+def aws_download(archived_file,bucket):
+	cwd=os.getcwd()
+	s3 = boto3.resource('s3')
+	print(archived_file)
+	os.chdir("/tmp/")
+	s3.Bucket('localdotnet').download_file(archived_file,'restore_archive.tar.gz')
+	os.chdir(cwd)
+	return("/tmp/restore_archive.tar.gz")
+
+def aws_delete(archived_file,bucket):
+	s3.Object(bucket,archived_file).delete()
 
 
 
@@ -98,7 +117,7 @@ def archive_folder(backup_folder):
 	base_archive_dir="base_dir="+backup_folder
 	print(archive_name,backup_folder)
 	shutil.make_archive(archive_name,'gztar',backup_folder)
-	saved_file=archive_name+"tar.gz"
+	saved_file=archive_name+".tar.gz"
 	return(saved_file)
 
 def sql_dump(dump_folder):
@@ -134,7 +153,7 @@ def backup(yaml_data):
 			saved_file=archive_folder(backup_folder)
 			#move archive to s3
 			shutil.rmtree(backup_folder)
-			aws_upload(saved_file)
+			aws_upload(saved_file,yaml_data)
 		else:
 			cwd=os.getcwd()
 			print("Installing aws cli")
@@ -210,6 +229,10 @@ if sys.argv[1] == "backup" and len(sys.argv) == 2:
 elif sys.argv[1] == "restore" and len(sys.argv) == 4:
 	savedate=datetime.datetime.strptime(sys.argv[3],'%Y-%m-%d')
 	restore(sys.argv[2],savedate)
+	saved_archive=sys.argv[3]+".tar.gz"
+	bucket=yaml_data.get('aws').get('bucket')
+	downloaded_backup=aws_download(saved_archive,bucket)
+
 else:
 	sys.exit("error in args given")
 

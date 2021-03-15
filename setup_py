@@ -181,12 +181,15 @@ print("STEP 7 : SSL for apache installed")
 wp_logger.info("STEP 7 : SSL for apache installed")
 
 ### STEP 8 : install wordpress (copy from cli and config)
+cwd=os.getcwd()
+os.chdir(yaml_data.get('www').get('www_path'))
 
 wp_inst=yaml_data.get('commands').get('wp_inst')
 command_use(wp_inst)
 print("STEP 8 : Wordpress installed")
 wp_logger.info("STEP 8 : Wordpress installed")
-install_dir=""
+wp_inst_cli=yaml_data.get('commands').get('wp_inst_cli')
+command_use(wp_inst_cli)
 
 ### STEP 9 : Editing conf files ###
 if os.path.exists("/tmp/.wp_flag") == True:
