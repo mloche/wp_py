@@ -49,6 +49,7 @@ def aws_upload(saved_file,yaml_data):
 	try:
 
 		s3.Bucket(bucket_name).upload_file(file_path,saved_file)
+		os.remove(file_path)
 		os.chdir(cwd)
 	except:
 		sys.exit("s3 uplad failed")
