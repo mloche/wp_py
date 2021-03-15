@@ -39,26 +39,33 @@ def aws_save(yaml_data):
 	backup_folder = yaml_data.get('backup_folder')
 	bucket_name=yaml_data.get('aws').get('bucket')
 	print("backup AWS in folder ",backup_folder, "in bucket", bucket_name)
-	aws_files=yaml_data.get('files')
-	files_copy(backup_folder,aws_files)
-	sql_dump(backup_folder)
 
 
 
 
 
-def files_copy(folder,file):
-	print("copying {} to {}".format(file,folder))
-	save_file=folder+"/backups/file"
-	temp_file="/tmp/save"
-	for line in file:
-		print(line)
-		files._insert_top(temp_file,line)
-	subprocess.run(['aws','s3','cp',temp_file,'s3://localdotnet/backups/'])
+
+def files_copy(backup_folder,file_list):
+	print("copying {} to {}".format(file_list,backup_folder))
+	for file in file_list:
+		print(file)
+#		subprocess.run(['cp',file,backup_folder])
+		shutil.copy(file,backup_folder)
+
+def folders_copy(backup_folder,folder_list):
+	print("copying folder {} to {}".format(folder_list,backup_folder))
+#	print(folder_list,type(folder_list))
+	for folder in folder_list:
+		target_folder=backup_folder+folder
+		print(target_folder)
+		shutil.copytree(folder,backup_folder, dirs_exist_ok=True)
+
 
 def sql_dump(dump_folder):
 	try:
-		dumpcmd='mysqldump'+' --host=localhost' +' --user=wordpress' + ' --password=wordpress'+' --databases'+' wordpress'+' --result-file=/tmp/dump.sql'
+#		print(dump_folder)
+		dump_file="--result-file="+dump_folder+"/sqldump-"+datetime.date.today().strftime("%Y-%m-%d")
+		dumpcmd='mysqldump'+' --host=localhost' +' --user=wordpress' + ' --password=wordpress'+' --databases'+' wordpress '+dump_file
 		subprocess.run(dumpcmd.split())
 	except:
 		sys.exit("sqldump failed")
@@ -66,6 +73,10 @@ def sql_dump(dump_folder):
 def backup(yaml_data):
 #	print("data received for backup",yaml_data)
 	method=yaml_data.get('backup_method')
+	backup_date=datetime.date.today()
+	backup_folder="/tmp/"+"backup-"+backup_date.strftime("%Y-%m-%d")
+	subprocess.run(['mkdir','-p',backup_folder])
+	print(backup_folder)
 #	print(method)
 	if method == None:
 		backup_logger.info("Backup method was not configured")
@@ -74,7 +85,12 @@ def backup(yaml_data):
 	elif method.lower() == "aws":
 		#installing aws cli
 		if os.path.exists(yaml_data.get('aws').get('lockfile')) == True:
-			aws_save(yaml_data)
+			file_list=yaml_data.get('files')
+			files_copy(backup_folder,file_list)
+			#aws_save(yaml_data)
+			sql_dump(backup_folder)
+			folder_list=yaml_data.get('folders')
+			folders_copy(backup_folder,folder_list)
 		else:
 			cwd=os.getcwd()
 			print("Installing aws cli")
@@ -143,6 +159,8 @@ if len(sys.argv) != 4 and sys.argv[1] == "restore":
 
 
 if sys.argv[1] == "backup" and len(sys.argv) == 2:
+#	backup_date=datetime.date.today()
+#	print(backup_date)
 	backup(yaml_data)
 
 elif sys.argv[1] == "restore" and len(sys.argv) == 4:

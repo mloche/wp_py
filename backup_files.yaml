@@ -11,13 +11,13 @@ files:
 # websrv_files:
  - /etc/apache2/apache2.conf
 # vhost_files:
- - /etc/apache2/site-available/wp.conf
+# - /etc/apache2/site-available/wp.conf
 # my:
  - /etc/mysql/my.cnf
 # php:
  - /etc/php/7.4/apache2/php.ini
-wp_folder:
-  /var/www/html
+folders:
+ - /var/www/html/
 websrv_cmdfull:
  a2ensite wp.conf
  systemctl apache2 restart
