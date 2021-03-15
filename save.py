@@ -58,7 +58,7 @@ def folders_copy(backup_folder,folder_list):
 	for folder in folder_list:
 		target_folder=backup_folder+folder
 		print(target_folder)
-		shutil.copytree(folder,backup_folder, dirs_exist_ok=True)
+		shutil.copytree(folder,backup_folder, exist_ok=True)
 
 
 def sql_dump(dump_folder):
