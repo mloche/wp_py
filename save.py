@@ -21,13 +21,16 @@ import database as mariadb
 import files
 import recurchown
 
-#mysqldump --user=wordpres --password=password --databases wordpress > /tmp/wp.dump
-#mysql -u wordpress --password=password < /tmp/wp.dump
 
 
 
 ### FUNCTIONS DEFINITION ###
-def restore(type,savedate):
+def restore(type,savedate,method):
+	if method.lower() == "aws":
+		saved_archive=sys.argv[3]+".tar.gz"
+		bucket=yaml_data.get('aws').get('bucket')
+		downloaded_backup=aws_download(saved_archive,bucket)
+
 	if isinstance(type,str) and isinstance(savedate,datetime.date):
 		if type.lower() == "wp":
 			print("Restore WP for {} date".format(savedate))
@@ -59,7 +62,7 @@ def aws_download(archived_file,bucket):
 	s3 = boto3.resource('s3')
 	print(archived_file)
 	os.chdir("/tmp/")
-	s3.Bucket('localdotnet').download_file(archived_file,'restore_archive.tar.gz')
+	s3.Bucket(bucket).download_file(archived_file,'restore_archive.tar.gz')
 	os.chdir(cwd)
 	return("/tmp/restore_archive.tar.gz")
 
@@ -143,8 +146,9 @@ def backup(yaml_data):
 		sys.exit("Backup method was not configured, exiting")
 
 	elif method.lower() == "aws":
-		#installing aws cli
-		if os.path.exists(yaml_data.get('aws').get('lockfile')) == True:
+		#if bucket do not exist create with life cycle
+
+		try:
 			file_list=yaml_data.get('files')
 			files_copy(backup_folder,file_list)
 			#aws_save(yaml_data)
@@ -155,20 +159,8 @@ def backup(yaml_data):
 			#move archive to s3
 			shutil.rmtree(backup_folder)
 			aws_upload(saved_file,yaml_data)
-		else:
-			cwd=os.getcwd()
-			print("Installing aws cli")
-			subprocess.run(['wget','https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip','-O', '/tmp/awscli.zip'])
-			os.chdir("/tmp")
-			subprocess.run(['unzip','awscli.zip'])
-			subprocess.run(['rm','awscli.zip'])
-			os.chdir("/tmp/aws")
-#			print(os.getcwd())
-			subprocess.run('./install')
-			os.chdir(cwd)
-			subprocess.run(['rm','-R','/tmp/aws'])
-#			print(os.getcwd())
-			aws_save(yaml_data)
+		except:
+			sys.exit("AWS backup could not be done")
 	elif method.lower() == "folder":
 		backup_folder = yaml_data.get('backup_folder')
 		print("Backup folder ", backup_folder)
@@ -223,16 +215,15 @@ if len(sys.argv) != 4 and sys.argv[1] == "restore":
 
 
 if sys.argv[1] == "backup" and len(sys.argv) == 2:
-#	backup_date=datetime.date.today()
+	backup_date=datetime.date.today()
 #	print(backup_date)
 	backup(yaml_data)
 
+
 elif sys.argv[1] == "restore" and len(sys.argv) == 4:
 	savedate=datetime.datetime.strptime(sys.argv[3],'%Y-%m-%d')
-	restore(sys.argv[2],savedate)
-	saved_archive=sys.argv[3]+".tar.gz"
-	bucket=yaml_data.get('aws').get('bucket')
-	downloaded_backup=aws_download(saved_archive,bucket)
+	method=yaml_data.get('backup_method')
+	restore(sys.argv[2],savedate,method)
 
 else:
 	sys.exit("error in args given")
