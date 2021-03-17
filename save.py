@@ -49,9 +49,11 @@ def aws_upload(saved_file,yaml_data):
 #	backup_folder = yaml_data.get('backup_folder')
 	bucket_name=yaml_data.get('aws').get('bucket')
 	print("backup AWS ! file ",file_path, "in bucket", bucket_name)
+	saved_file_path=yaml_data.get('aws').get('folder')+saved_file
+	print(saved_file_path)
 	try:
 
-		s3.Bucket(bucket_name).upload_file(file_path,saved_file)
+		s3.Bucket(bucket_name).upload_file(file_path,saved_file_path)
 		os.remove(file_path)
 		os.chdir(cwd)
 	except:
@@ -146,7 +148,8 @@ def backup(yaml_data):
 		sys.exit("Backup method was not configured, exiting")
 
 	elif method.lower() == "aws":
-		#if bucket do not exist create with life cycle
+		#if bucket do not exist create
+		#if lifecycle changed or blank set ttl
 
 		try:
 			file_list=yaml_data.get('files')

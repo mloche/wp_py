@@ -6,7 +6,9 @@ backup_method: aws
 backup_folder: /tmp/backups
 aws:
  bucket: localdotnet
- lockfile: /tmp/.cliinstalled
+ region: eu-west-3
+ lifecycle: 6
+ folder: saves/
 files:
 # websrv_files:
  - /etc/apache2/apache2.conf
