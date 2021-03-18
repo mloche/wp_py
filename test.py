@@ -15,9 +15,26 @@ print(dirb)
 
 
 
-lookbucket=input("bucket to look for \n")
+#lookbucket=input("bucket to look for \n")
 #print(lookbucket)
 s3 = boto3.client('s3')
+s3client=boto3.resource('s3')
+my_bucket=s3client.Bucket('localdotnet')
+
+date=input("Date of save : \n")
+
+for object_summary in my_bucket.objects.filter(Prefix="saves/"):
+	print(object_summary.key)
+	print(type(object_summary.key))
+	result=object_summary.key.find(date)
+	print(result)
+
+suppr_obj=s3client.Object('localdotnet','saves/2021-03-15.tar.gz')
+
+suppr_result=suppr_obj.delete()
+
+print(suppr_result)
+
 buckets=[]
 #s3.create_bucket(Bucket='localdotcom')
 

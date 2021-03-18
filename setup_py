@@ -254,6 +254,9 @@ wp_inst_end=yaml_data.get('commands').get('wp_inst_cli')
 #www_url=yaml_data.get('magento_setup')['base-url-secure']
 command_use(wp_inst_end)
 command_use(apache_end)
+#ne pas renommmer wp-cli et appel via php wp-cli.phar ..
+
+
 """
 try:
 	recurchown._recur_chown(www_path,www_user, www_group,True)
