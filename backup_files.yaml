@@ -1,14 +1,19 @@
-logging: "/var/log/backup.log"
+logging: "/var/log/wp_py.log"
 #method can be aws, scp or folder
 #folder needs to be given for folder option
 #folder and key file will be required for aws option
+rotation: 7
 backup_method: aws
 backup_folder: /tmp/backups
+database:
+ host: localhost
+ name: wordpress
+ admin: wordpress
+ password: wordpress
 aws:
- bucket: localdotnet
+ bucket: localdotfr
  region: eu-west-3
- lifecycle: 6
- folder: saves/
+ folder: saved_files/
 files:
 # websrv_files:
  - /etc/apache2/apache2.conf

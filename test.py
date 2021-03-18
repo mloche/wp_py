@@ -2,6 +2,10 @@
 import os
 import boto3
 import datetime
+delta = datetime.timedelta(days=7)
+delta_date=datetime.date.today() - delta
+print(delta_date)
+
 
 """
 dira = os.getcwd()
