@@ -42,9 +42,32 @@ def restore(type,savedate,method):
 					if os.path.exists(downloaded_backup):
 						down_result=0
 						backup_logger.info("Downloaded backup for the {} in {}".format(savedate,downloaded_backup))
+				elif method.lower() == "smb" and down_result != 0:
+					print("smb down loop")
+					saved_archive=sys.argv[3]+".tar.gz"
+					smb_credentials=yaml_data.get('smb').get('credentials')
+					smb_host=yaml_data.get('smb').get('host')+ "/" + yaml_data.get('smb').get('share')
+					smb_mount=yaml_data.get('smb').get('mount')
+					mount_cmd="mount -t cifs -o rw,vers=3.0,credentials="+smb_credentials  +" //"+smb_host+" " + smb_mount
+					if not os.path.exists(smb_mount):
+						print("create mount point loop")
+						subprocess.run(['mkdir','-p',smb_mount])
+					subprocess.run(mount_cmd.split())
+					backup_logger.info("Mouting {} folder, done.".format(smb_mount))
+					try:
+						print(saved_archive,smb_mount)
+						smb_copy=smb_mount+saved_archive
+						shutil.copy(smb_copy,"/tmp/")
+						subprocess.run(['umount',smb_mount])
+						backup_logger.info("Saved archive {}, downloaded".format(smb_copy)) 
+					except:
+						backup_logger.error("Saved archive was not downloaded")
+
+
 			else:
 				backup_logger.error("Invalid type of restoration asked, usage is WP/full/down")
 				raise ValueError("Invalid type of restore asked, wp, down or full")
+
 		else :
 			backup_logger.error("Restoration type must be string type")
 			raise ValueError("Invalid type of arguments, please provide string WP, down or full")
@@ -189,7 +212,7 @@ def archive_folder(backup_folder):
 		archive_name=datetime.date.today().strftime("%Y-%m-%d")
 		os.chdir("/tmp/")
 		base_archive_dir="base_dir="+backup_folder
-		print(archive_name,backup_folder)
+#		print(archive_name,backup_folder)
 		shutil.make_archive(archive_name,'gztar',backup_folder)
 		saved_file=archive_name+".tar.gz"
 		backup_logger.info("Archive {} created with success.".format(saved_file))
@@ -203,9 +226,9 @@ def sql_dump(dump_folder,db_data):
 	try:
 #		print(dump_folder)
 		dump_file="--result-file="+dump_folder+"/sqldump-"+datetime.date.today().strftime("%Y-%m-%d")
-	#	dumpcmd='mysqldump'+' --host=' + db_data['host'] +' --user=' + db_data['admin'] + ' --password='+ db_data['password'] + ' --databases '+ db_data['name']+" " +dump_file
-		dumpcmd='mysqldump --host=localhost --user=wordpress  --password=wordpress --databases wordpress ' +dump_file
-		print(dumpcmd)
+		dumpcmd='mysqldump'+' --host=' + db_data['host'] +' --user=' + db_data['admin'] + ' --password='+ db_data['password'] + ' --databases '+ db_data['name']+" " +dump_file
+#		dumpcmd='mysqldump --host=localhost --user=wordpress  --password=wordpress --databases wordpress ' +dump_file
+#		print(dumpcmd)
 		subprocess.run(dumpcmd.split())
 		backup_logger.info("Dump success")
 	except:
@@ -267,6 +290,7 @@ def backup(yaml_data):
 
 
 	elif method.lower() == "smb":
+		backup_logger.info("Starting smb backup method")
 		file_list=yaml_data.get('files')
 		files_copy(backup_folder,file_list)
 		sql_dump(backup_folder,yaml_data.get('database'))
@@ -274,21 +298,26 @@ def backup(yaml_data):
 		folders_copy(backup_folder,folder_list)
 		saved_file="/tmp/"+archive_folder(backup_folder)
 		#move archive to s3
-#		shutil.rmtree(backup_folder)
+		shutil.rmtree(backup_folder)
 		smb_credentials=yaml_data.get('smb').get('credentials')
 		smb_host=yaml_data.get('smb').get('host')+ "/" + yaml_data.get('smb').get('share')
 		smb_mount=yaml_data.get('smb').get('mount')
-		mount_cmd="sudo mount -t cifs -o rw,vers=3.0,credentials="+smb_credentials+" //"+smb_host+" " + smb_mount
-		print(mount_cmd)
+		mount_cmd="sudo mount -t cifs -o rw,vers=3.0,credentials="+smb_credentials  +" //"+smb_host+" " + smb_mount
+		if not os.path.exists(smb_mount):
+			subprocess.run(['mkdir','-p',smb_mount])
+			backup_logger.info("Mouting {} folder, done.".format(smb_mount))
 		subprocess.run(mount_cmd.split())
 		try:
-			print(saved_file,smb_mount)
+	#		print(saved_file,smb_mount)
 			shutil.copy(saved_file,smb_mount)
+			del_cmd="find "+smb_mount +" -type f -mtime +" +str(yaml_data.get('rotation'))+" -name \'*.gz\' -delete"
+	#		print(del_cmd)
+			subprocess.run(del_cmd.split())
+			subprocess.run(['umount',smb_mount])
+			subprocess.run(['rm',saved_file])
+			backup_logger.info("Saved archive {}, transfered".format(saved_file)) 
 		except:
-			print("shutil copy not working")
-		#smb_copy(saved_file,yaml_data)
-		#print("smb save ok")
-		print("Backup folder ", backup_folder)
+			backup_logger.error("Saved archive was not transfered")
 	elif method.lower() == "scp":
 		print("backup using scp")
 
