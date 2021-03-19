@@ -2,9 +2,26 @@
 import os
 import boto3
 import datetime
-delta = datetime.timedelta(days=7)
+delta = datetime.timedelta(days=1)
 delta_date=datetime.date.today() - delta
 print(delta_date)
+
+from smb.SMBConnection import SMBConnection
+host="192.168.1.10"
+username="savescript"
+password="save"
+conn=SMBConnection(username,password,"","")
+print(conn)
+result=conn.connect(host,445)
+print("connection :",result)
+localfile=open("/tmp/my.cnf","rb")
+print(localfile)
+for share in conn.listShares():
+	print("share : ",share.name)
+
+conn.storeFile("saves","2021-03-15.cnf",localfile)
+localfile.close()
+
 
 
 """
@@ -14,7 +31,7 @@ tempdir="//tmp"
 dirb = os.chdir(tempdir)
 dirb = os.getcwd()
 print(dirb)
-"""
+
 
 
 
@@ -28,16 +45,19 @@ my_bucket=s3client.Bucket('localdotnet')
 date=input("Date of save : \n")
 
 for object_summary in my_bucket.objects.filter(Prefix="saves/"):
-	print(object_summary.key)
-	print(type(object_summary.key))
+	if object_summary.last_modified.date() < delta_date :
+		print("must be delete ",object_summary.key)
+	else:
+		print("Will not be delete ",object_summary.key)
+#	print(type(object_summary.key))
 	result=object_summary.key.find(date)
-	print(result)
+#	print(result)
 
 suppr_obj=s3client.Object('localdotnet','saves/2021-03-15.tar.gz')
 
-suppr_result=suppr_obj.delete()
+#suppr_result=suppr_obj.delete()
 
-print(suppr_result)
+#print(suppr_result)
 
 buckets=[]
 #s3.create_bucket(Bucket='localdotcom')
@@ -68,7 +88,7 @@ print("policy",policy_exists['Rules'])
 #	policy=policy_exists['Rules'][0]['Expiration']
 
 #	print("policy do not exist")
-"""
+
 reponse=s3.put_bucket_lifecycle_configuration(Bucket='localdotnet', LifecycleConfiguration={
 'Rules': [
 	{
@@ -82,7 +102,7 @@ reponse=s3.put_bucket_lifecycle_configuration(Bucket='localdotnet', LifecycleCon
 		 'ExpiredObjectDeleteMarker': True},
 	'ID': 'Delete after 7 days'}]})
 
-"""
+
 reponse=s3.put_bucket_lifecycle_configuration(Bucket='localdotnet', LifecycleConfiguration={
 'Rules': [
 	{
@@ -98,8 +118,5 @@ reponse=s3.put_bucket_lifecycle_configuration(Bucket='localdotnet', LifecycleCon
 	'Status':'Enabled',
 }]})
 print(reponse['ResponseMetadata']['HTTPStatusCode'])
+"""
 
-#botobucket.configure_lifecycle(LifecycleConfiguration)
-
-#except:
-#	print("could not apply policy")

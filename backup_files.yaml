@@ -11,9 +11,19 @@ database:
  admin: wordpress
  password: wordpress
 aws:
- bucket: localdotfr
+ bucket: localdotnet
  region: eu-west-3
- folder: saved_files/
+ folder: saves/
+smb:
+ host: 192.168.1.10
+ share: saves
+ user: savescript
+ password: save
+ mount: /mnt/saves
+ credentials: /root/.smbcredentials
+scp:
+ host:
+ folder:
 files:
 # websrv_files:
  - /etc/apache2/apache2.conf

@@ -15,6 +15,7 @@ import fileinput
 import logging
 from logging.handlers import RotatingFileHandler
 import zlib
+from smb.SMBConnection import SMBConnection
 #Custom modules#
 import database as mariadb
 import files
@@ -26,18 +27,21 @@ import recurchown
 ### FUNCTIONS DEFINITION ###
 def restore(type,savedate,method):
 	try:
-		if method.lower() == "aws":
-			saved_archive=sys.argv[3]+".tar.gz"
-			bucket=yaml_data.get('aws').get('bucket')
-			downloaded_backup=aws_download(saved_archive,bucket)
-
 		if isinstance(type,str) and isinstance(savedate,datetime.date):
 			if type.lower() == "wp":
-				print("Restore WP for {} date".format(savedate))
+				print("Restore WP for {} date".format(savedate.date()))
 			elif type.lower() == "full":
-				print("Restore FULL for {} date".format(savedate))
+				print("Restore FULL for {} date".format(savedate.date()))
 			elif type.lower() == "down":
-				print("Downloading file for {} archive".format(savedate))
+				print("Downloading file for {} archive".format(savedate.date()))
+				down_result=1
+				if method.lower() == "aws" and down_result != 0:
+					saved_archive=sys.argv[3]+".tar.gz"
+					bucket=yaml_data.get('aws').get('bucket')
+					downloaded_backup=aws_download(saved_archive,bucket)
+					if os.path.exists(downloaded_backup):
+						down_result=0
+						backup_logger.info("Downloaded backup for the {} in {}".format(savedate,downloaded_backup))
 			else:
 				backup_logger.error("Invalid type of restoration asked, usage is WP/full/down")
 				raise ValueError("Invalid type of restore asked, wp, down or full")
@@ -47,6 +51,23 @@ def restore(type,savedate,method):
 	except:
 		backup_logger.error("Could not start restore")
 		sys.exit("Restoration could not be done")
+
+def smb_copy(saved_file,yaml_data):
+	try:
+		smb_host=yaml_data.get('smb').get('host')
+		smb_user=yaml_data.get('smb').get('user')
+		smb_password=yaml_data.get('smb').get('password')
+		smb_share=yaml_data.get('smb').get('share')
+		smb_con=SMBConnection(smb_user,smb_password,"","")
+		connection=smb_con.connect(smb_host,445)
+		localfile=open(saved_file,"rb")
+		smb_savedfile="backup-"+datetime.date.today().strftime("%Y-%m-%d")+".tar.gz"
+		smb_con.storeFile(smb_share,smb_savedfile,localfile)
+		localfile.close()
+		backup_logger.info("smb copy successfully uploaded {} on {}.".format(smb_savedfile,smb_host))
+	except:
+		print("SMB save did not work")
+		backup_logger.critical("SMB export did not work for {} on {}.".format(smb_savedfile,smb_host))
 
 def aws_upload(saved_file,yaml_data):
 	cwd=os.getcwd()
@@ -99,14 +120,12 @@ def aws_create_bucket(bucket_name,region):
 def aws_delete(save_date,bucket,bucket_folder):
 	try:
 #		print("Values received in aws_delete are date {}, bucket {} and folder {}. ".format(save_date,bucket,bucket_folder))
-		date_str=save_date.strftime("%Y-%m-%d")
+		delete_result=1
 		for object_summary in bucket.objects.filter(Prefix=bucket_folder):
-			if object_summary.key.find(date_str) != -1:
+			if object_summary.last_modified.date() < save_date:
+				backup_logger.info("Deleted object {} from bucket {}".format(object_summary.key,bucket_folder))
 				object_summary.delete()
 				delete_result=0
-				backup_logger("File {} deleted from bucket {}.".format(object_summary.key, bucket))
-			else:
-				delete_result=1
 		return(delete_result)
 
 	except:
@@ -184,7 +203,8 @@ def sql_dump(dump_folder,db_data):
 	try:
 #		print(dump_folder)
 		dump_file="--result-file="+dump_folder+"/sqldump-"+datetime.date.today().strftime("%Y-%m-%d")
-		dumpcmd='mysqldump'+' --host=' + db_data['host'] +' --user=' + db_data['admin'] + ' --password='+ db_data['password'] + ' --databases '+ db_data['name']+" " +dump_file
+	#	dumpcmd='mysqldump'+' --host=' + db_data['host'] +' --user=' + db_data['admin'] + ' --password='+ db_data['password'] + ' --databases '+ db_data['name']+" " +dump_file
+		dumpcmd='mysqldump --host=localhost --user=wordpress  --password=wordpress --databases wordpress ' +dump_file
 		print(dumpcmd)
 		subprocess.run(dumpcmd.split())
 		backup_logger.info("Dump success")
@@ -201,9 +221,9 @@ def backup(yaml_data):
 	backup_date=datetime.date.today()
 	rotation_duration=datetime.timedelta(yaml_data.get('rotation'))
 	to_delete_save=datetime.date.today() - rotation_duration
-	print("Saves from the {} will be erased.".format(to_delete_save))
+	print("Saves older than the {} will be erased.".format(to_delete_save))
 	backup_folder="/tmp/"+"backup-"+backup_date.strftime("%Y-%m-%d")
-	subprocess.run(['mkdir','-p',backup_folder])
+	subprocess.run(['mkdir','-p','--mode=777',backup_folder])
 #	print(backup_folder)
 #	print(method)
 
@@ -231,8 +251,6 @@ def backup(yaml_data):
 		folder_list=yaml_data.get('folders')
 		folders_copy(backup_folder,folder_list)
 		saved_file=archive_folder(backup_folder)
-		#move archive to s3
-		shutil.rmtree(backup_folder)
 		up_result=aws_upload(saved_file,yaml_data)
 		if up_result == 0:
 			s3res=boto3.resource('s3')
@@ -245,10 +263,31 @@ def backup(yaml_data):
 				print("Old backup deleted")
 			else:
 				print("aws_delete result in unknown status")
+		shutil.rmtree(backup_folder)
 
 
-	elif method.lower() == "folder":
-		backup_folder = yaml_data.get('backup_folder')
+	elif method.lower() == "smb":
+		file_list=yaml_data.get('files')
+		files_copy(backup_folder,file_list)
+		sql_dump(backup_folder,yaml_data.get('database'))
+		folder_list=yaml_data.get('folders')
+		folders_copy(backup_folder,folder_list)
+		saved_file="/tmp/"+archive_folder(backup_folder)
+		#move archive to s3
+#		shutil.rmtree(backup_folder)
+		smb_credentials=yaml_data.get('smb').get('credentials')
+		smb_host=yaml_data.get('smb').get('host')+ "/" + yaml_data.get('smb').get('share')
+		smb_mount=yaml_data.get('smb').get('mount')
+		mount_cmd="sudo mount -t cifs -o rw,vers=3.0,credentials="+smb_credentials+" //"+smb_host+" " + smb_mount
+		print(mount_cmd)
+		subprocess.run(mount_cmd.split())
+		try:
+			print(saved_file,smb_mount)
+			shutil.copy(saved_file,smb_mount)
+		except:
+			print("shutil copy not working")
+		#smb_copy(saved_file,yaml_data)
+		#print("smb save ok")
 		print("Backup folder ", backup_folder)
 	elif method.lower() == "scp":
 		print("backup using scp")
