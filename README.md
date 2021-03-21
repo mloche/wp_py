@@ -25,7 +25,9 @@ Or you can install manually the following packages and modules :
  - git package
  - python modules PyYAML,boto3, raw-zlib and PyMySQL
 
-If using the aws s3 service for backups, user will have to create aws secret key file in "~/.aws/credentials"
+If using the aws s3 method for backups, user will have to create aws secret key file in "/root/.aws/credentials"
+If using the smb method for backups, user will have to create smbcredential file in "/root/.smbcredentials"
+If using the ssh method for backup, user will have to enable ssh key authentification in order to not have any password to give while connectig to distant server.
 
 
 #  USAGE  

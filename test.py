@@ -2,10 +2,25 @@
 import os
 import boto3
 import datetime
+import spur
+import shutil
 delta = datetime.timedelta(days=1)
 delta_date=datetime.date.today() - delta
 print(delta_date)
 
+
+
+shell= spur.SshShell(hostname="192.168.1.10",username="root",private_key_file="/root/.ssh/id_rsa.pub")
+with shell.open("/saves/from_ssh/","wb") as remote_file:
+	print(remote_file)
+	with open("./wp.sh", "rb") as local_file:
+		print(local_file)
+		shutil.copyfileobj(local_file,remote_file)
+
+#	result= shell.run(['cd','plop'])
+#print(result.output)
+
+"""
 from smb.SMBConnection import SMBConnection
 host="192.168.1.10"
 username="savescript"
@@ -21,7 +36,7 @@ for share in conn.listShares():
 
 conn.storeFile("saves","2021-03-15.cnf",localfile)
 localfile.close()
-
+"""
 
 
 """

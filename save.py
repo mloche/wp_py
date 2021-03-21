@@ -15,6 +15,7 @@ import fileinput
 import logging
 from logging.handlers import RotatingFileHandler
 import zlib
+import spur
 from smb.SMBConnection import SMBConnection
 #Custom modules#
 import database as mariadb
@@ -43,14 +44,12 @@ def restore(type,savedate,method):
 						down_result=0
 						backup_logger.info("Downloaded backup for the {} in {}".format(savedate,downloaded_backup))
 				elif method.lower() == "smb" and down_result != 0:
-					print("smb down loop")
 					saved_archive=sys.argv[3]+".tar.gz"
 					smb_credentials=yaml_data.get('smb').get('credentials')
 					smb_host=yaml_data.get('smb').get('host')+ "/" + yaml_data.get('smb').get('share')
 					smb_mount=yaml_data.get('smb').get('mount')
 					mount_cmd="mount -t cifs -o rw,vers=3.0,credentials="+smb_credentials  +" //"+smb_host+" " + smb_mount
 					if not os.path.exists(smb_mount):
-						print("create mount point loop")
 						subprocess.run(['mkdir','-p',smb_mount])
 					subprocess.run(mount_cmd.split())
 					backup_logger.info("Mouting {} folder, done.".format(smb_mount))
@@ -231,6 +230,11 @@ def sql_dump(dump_folder,db_data):
 #		print(dumpcmd)
 		subprocess.run(dumpcmd.split())
 		backup_logger.info("Dump success")
+		size=os.stat(dump_folder+"/sqldump-"+datetime.date.today().strftime("%Y-%m-%d")).st_size
+		if size > 20000:
+			backup_logger.info("Dump size bigger than 20Ko")
+		else:
+			bakcup_logger.error("dump size lower than 20Ko, content needs to be checked")
 	except:
 		backup_logger.error("Sql dump failed, exiting")
 		sys.exit("sqldump failed")
@@ -297,7 +301,6 @@ def backup(yaml_data):
 		folder_list=yaml_data.get('folders')
 		folders_copy(backup_folder,folder_list)
 		saved_file="/tmp/"+archive_folder(backup_folder)
-		#move archive to s3
 		shutil.rmtree(backup_folder)
 		smb_credentials=yaml_data.get('smb').get('credentials')
 		smb_host=yaml_data.get('smb').get('host')+ "/" + yaml_data.get('smb').get('share')
@@ -318,9 +321,38 @@ def backup(yaml_data):
 			backup_logger.info("Saved archive {}, transfered".format(saved_file)) 
 		except:
 			backup_logger.error("Saved archive was not transfered")
-	elif method.lower() == "scp":
-		print("backup using scp")
+	elif method.lower() == "ssh":
 
+
+		backup_logger.info("Starting SSH backup method")
+		file_list=yaml_data.get('files')
+		files_copy(backup_folder,file_list)
+		sql_dump(backup_folder,yaml_data.get('database'))
+		folder_list=yaml_data.get('folders')
+		folders_copy(backup_folder,folder_list)
+		saved_file=archive_folder(backup_folder)
+		saved_file_path="/tmp/"+saved_file
+		shutil.rmtree(backup_folder)
+		ssh_host=yaml_data.get('ssh').get('host')
+		ssh_folder=yaml_data.get('ssh').get('folder')
+		ssh_user=yaml_data.get('ssh').get('user')
+		ssh_key=yaml_data.get('ssh').get('key')
+		shell=spur.SshShell(hostname=ssh_host,username=ssh_user,private_key_file=ssh_key)
+		distant_file=ssh_folder+saved_file
+		try:
+			with shell.open(distant_file,"wb") as remote_ssh_file:
+				with open(saved_file_path,"rb") as local_ssh_file:
+					shutil.copyfileobj(local_ssh_file,remote_ssh_file)
+					backup_logger.info("Saved archive {} on remote SSH host.".format(distant_file)) 
+			with shell:
+				shell_cmd='find',ssh_folder,'-type','f','-name','*.gz','-mtime',str(yaml_data.get('rotation')),'-delete'
+				backup_logger.info("Remote files older than 7 days removed")
+
+		except:
+			backup_logger.error("Saved archive was not transfered")
+
+		backup_logger.info("SSH backup ended")
+		print("backup using SSH ended")
 
 	backup_logger.info("End of backup function")
 
@@ -341,8 +373,9 @@ def import_yaml(file):
 
 print("#####################################\n###### {} IS STARTING ###### \n ".format(sys.argv[0]))
 
-yaml_data=import_yaml("backup_files.yaml")
+yaml_data=import_yaml("./backup_files.yaml")
 #print(yaml_data)
+
 
 ### CREATING ERROR HANDLERS ###
 log_path=yaml_data.get('logging')

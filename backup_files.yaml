@@ -3,7 +3,7 @@ logging: "/var/log/wp_py.log"
 #folder needs to be given for folder option
 #folder and key file will be required for aws option
 rotation: 7
-backup_method: smb
+backup_method: ssh
 backup_folder: /tmp/backups
 database:
  host: localhost
@@ -17,13 +17,13 @@ aws:
 smb:
  host: 192.168.1.10
  share: saves
-# user: savescript
-# password: save
  mount: /mnt/saves/
  credentials: /root/.smbcredentials
-scp:
- host:
- folder:
+ssh:
+ host: 192.168.1.10
+ folder: /saves/from_ssh/
+ key: /root/.ssh/id_rsa.pub
+ user: root
 files:
 # websrv_files:
  - /etc/apache2/apache2.conf
