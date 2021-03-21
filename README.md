@@ -23,7 +23,7 @@ Or you can install manually the following packages and modules :
  - python3-pip package 
  - sudo package
  - git package
- - python modules PyYAML,boto3, raw-zlib and PyMySQL
+ - python modules PyYAML,boto3, raw-zlib, spur and PyMySQL
 
 If using the aws s3 method for backups, user will have to create aws secret key file in "/root/.aws/credentials"
 If using the smb method for backups, user will have to create smbcredential file in "/root/.smbcredentials"

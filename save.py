@@ -16,7 +16,6 @@ import logging
 from logging.handlers import RotatingFileHandler
 import zlib
 import spur
-from smb.SMBConnection import SMBConnection
 #Custom modules#
 import database as mariadb
 import files
@@ -26,47 +25,59 @@ import recurchown
 
 
 ### FUNCTIONS DEFINITION ###
-def restore(type,savedate,method):
+def restore(savedate,method):
 	try:
-		if isinstance(type,str) and isinstance(savedate,datetime.date):
-			if type.lower() == "wp":
-				print("Restore WP for {} date".format(savedate.date()))
-			elif type.lower() == "full":
-				print("Restore FULL for {} date".format(savedate.date()))
-			elif type.lower() == "down":
-				print("Downloading file for {} archive".format(savedate.date()))
-				down_result=1
-				if method.lower() == "aws" and down_result != 0:
-					saved_archive=sys.argv[3]+".tar.gz"
-					bucket=yaml_data.get('aws').get('bucket')
-					downloaded_backup=aws_download(saved_archive,bucket)
-					if os.path.exists(downloaded_backup):
-						down_result=0
-						backup_logger.info("Downloaded backup for the {} in {}".format(savedate,downloaded_backup))
-				elif method.lower() == "smb" and down_result != 0:
-					saved_archive=sys.argv[3]+".tar.gz"
-					smb_credentials=yaml_data.get('smb').get('credentials')
-					smb_host=yaml_data.get('smb').get('host')+ "/" + yaml_data.get('smb').get('share')
-					smb_mount=yaml_data.get('smb').get('mount')
-					mount_cmd="mount -t cifs -o rw,vers=3.0,credentials="+smb_credentials  +" //"+smb_host+" " + smb_mount
-					if not os.path.exists(smb_mount):
-						subprocess.run(['mkdir','-p',smb_mount])
-					subprocess.run(mount_cmd.split())
-					backup_logger.info("Mouting {} folder, done.".format(smb_mount))
-					try:
-						print(saved_archive,smb_mount)
-						smb_copy=smb_mount+saved_archive
-						shutil.copy(smb_copy,"/tmp/")
-						subprocess.run(['umount',smb_mount])
-						backup_logger.info("Saved archive {}, downloaded".format(smb_copy)) 
-					except:
-						backup_logger.error("Saved archive was not downloaded")
-
+		if isinstance(method,str) and isinstance(savedate,datetime.date):
+			print("Downloading file for {} archive".format(savedate.date()))
+			down_result=1
+			if method.lower() == "aws" and down_result != 0:
+				saved_archive=sys.argv[2]+".tar.gz"
+				bucket=yaml_data.get('aws').get('bucket')
+				downloaded_backup=aws_download(saved_archive,bucket)
+				if os.path.exists(downloaded_backup):
+					down_result=0
+					backup_logger.info("Downloaded backup for the {} in {}".format(savedate,downloaded_backup))
+			elif method.lower() == "smb" and down_result != 0:
+				saved_archive=sys.argv[2]+".tar.gz"
+				smb_credentials=yaml_data.get('smb').get('credentials')
+				smb_host=yaml_data.get('smb').get('host')+ "/" + yaml_data.get('smb').get('share')
+				smb_mount=yaml_data.get('smb').get('mount')
+				mount_cmd="mount -t cifs -o rw,vers=3.0,credentials="+smb_credentials  +" //"+smb_host+" " + smb_mount
+				if not os.path.exists(smb_mount):
+					subprocess.run(['mkdir','-p',smb_mount])
+				subprocess.run(mount_cmd.split())
+				backup_logger.info("Mouting {} folder, done.".format(smb_mount))
+				try:
+					print(saved_archive,smb_mount)
+					smb_copy=smb_mount+saved_archive
+					shutil.copy(smb_copy,"/tmp/restored_smb.tar.gz")
+					subprocess.run(['umount',smb_mount])
+					backup_logger.info("Saved archive {}, downloaded".format(smb_copy)) 
+				except:
+					backup_logger.error("Saved archive was not downloaded")
+			elif method.lower() == "ssh":
+				ssh_host=yaml_data.get('ssh').get('host')
+				ssh_folder=yaml_data.get('ssh').get('folder')
+				ssh_user=yaml_data.get('ssh').get('user')
+				ssh_key=yaml_data.get('ssh').get('key')
+				shell=spur.SshShell(hostname=ssh_host,username=ssh_user,private_key_file=ssh_key)
+				distant_file=ssh_folder+sys.argv[2]+".tar.gz"
+				try:
+					with shell.open(distant_file,"rb") as remote_ssh_file:
+						with open("/tmp/restored_ssh.tar.gz","wb") as local_ssh_file:
+							shutil.copyfileobj(remote_ssh_file,local_ssh_file)
+							print("File downloaded in /tmp/restored_file.tar.gz")
+							backup_logger.info("Recovered archive {} from remote SSH host.".format(distant_file)) 
+				except:
+					backup_logger.error("Could not download file using SSH")
+					sys.exit("Could not download file using ssh")
 
 			else:
 				backup_logger.error("Invalid type of restoration asked, usage is WP/full/down")
 				raise ValueError("Invalid type of restore asked, wp, down or full")
 
+			print("Saved archive successfully downloaded")
+			backup_logger.info("End of restore function")
 		else :
 			backup_logger.error("Restoration type must be string type")
 			raise ValueError("Invalid type of arguments, please provide string WP, down or full")
@@ -117,10 +128,10 @@ def aws_download(archived_file,bucket):
 		s3 = boto3.resource('s3')
 #		print(archived_file)
 		os.chdir("/tmp/")
-		s3.Bucket(bucket).download_file(archived_file,'restore_archive.tar.gz')
+		s3.Bucket(bucket).download_file(archived_file,'restored_aws.tar.gz')
 		os.chdir(cwd)
 		backup_logger.info("file restored in /tmp")
-		return("/tmp/restore_archive.tar.gz")
+		return("/tmp/restored_aws.tar.gz")
 	except:
 		backup_logger.error("Could not download saved archive")
 		sys.exit("could not wonload saved archive")
@@ -397,9 +408,9 @@ if len(sys.argv) == 2 and sys.argv[1] != "backup":
 	backup_logger.error("Invalid usage for backup")
 	raise ValueError("Invalid usage, usage {} backup".format(sys.argv[0]))
 
-if len(sys.argv) != 4 and sys.argv[1] == "restore":
+if len(sys.argv) != 3 and sys.argv[1] == "restore":
 	backup_logger.info("Invalid usage for restore")
-	raise ValueError("You must provide saved archive date, usage {} restore full/WP date".format(sys.argv[0]))
+	raise ValueError("You must provide saved archive date, usage {} restore  date".format(sys.argv[0]))
 
 
 if sys.argv[1] == "backup" and len(sys.argv) == 2:
@@ -409,10 +420,10 @@ if sys.argv[1] == "backup" and len(sys.argv) == 2:
 	backup(yaml_data)
 
 
-elif sys.argv[1] == "restore" and len(sys.argv) == 4:
-	savedate=datetime.datetime.strptime(sys.argv[3],'%Y-%m-%d')
+elif sys.argv[1] == "restore" and len(sys.argv) == 3:
+	savedate=datetime.datetime.strptime(sys.argv[2],'%Y-%m-%d')
 	method=yaml_data.get('backup_method')
-	restore(sys.argv[2],savedate,method)
+	restore(savedate,method)
 
 else:
 	backup_logger.critical("Error in arguments given, exiting")
