@@ -15,7 +15,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import zlib
 import spur
-
+#import time
 
 
 
@@ -324,14 +324,13 @@ def backup(yaml_data):
 		try:
 	#		print(saved_file,smb_mount)
 			shutil.copy(saved_file,smb_mount)
-			del_cmd="find "+smb_mount +" -type f -mtime +" +str(yaml_data.get('rotation'))+" -name \'*.gz\' -delete"
-	#		print(del_cmd)
-			subprocess.run(del_cmd.split())
-			subprocess.run(['umount',smb_mount])
-			subprocess.run(['rm',saved_file])
-			backup_logger.info("Saved archive {}, transfered".format(saved_file)) 
+			print("Deleted files will be : \n")
+			os.system("find {} -maxdepth 1 -mtime +{} -name '*.gz' -print".format(smb_mount,str(yaml_data.get('rotation'))))
 		except:
-			backup_logger.error("Saved archive was not transfered")
+			backup_logger.error("Could not transfer new save and find older saves")
+		subprocess.run(['umount',smb_mount])
+		subprocess.run(['rm',saved_file])
+		backup_logger.info("Saved archive {}, transfered".format(saved_file)) 
 	elif method.lower() == "ssh":
 
 
@@ -352,18 +351,22 @@ def backup(yaml_data):
 		distant_file=ssh_folder+saved_file
 		try:
 			with shell.open(distant_file,"wb") as remote_ssh_file:
-				backup_logger.info("first with")
 				with open(saved_file_path,"rb") as local_ssh_file:
-					backup_logger.info("second with")
 					shutil.copyfileobj(local_ssh_file,remote_ssh_file)
 					backup_logger.info("Saved archive {} on remote SSH host.".format(distant_file)) 
-			with shell:
-				shell_cmd='find',ssh_folder,'-type','f','-name','*.gz','-mtime',str(yaml_data.get('rotation')),'-delete'
-				backup_logger.info("Remote files older than 7 days removed")
 
-			subprocess.run(['rm',saved_file_path])
 		except:
-			backup_logger.error("Saved archive was not transfered")
+			backup_logger.error("Could not save archive {} on remote host {} .".format(distant_file,ssh_host))
+			sys.exit("Could not save archive {} on remote host {} .".format(distant_file,ssh_host))
+
+		try:
+			ssh_cmd="ssh root@{} find {} -type f -mtime +{} -name '*.gz' -print".format(yaml_data.get('ssh').get('host'),ssh_folder,str(yaml_data.get('rotation')))
+			print("Deleted files will be : \n")
+			subprocess.run(ssh_cmd.split())
+			subprocess.run(['rm',saved_file_path])
+			backup_logger.info("Older saves removed")
+		except:
+			backup_logger.error("Older saves where not deleted")
 
 		backup_logger.info("SSH backup ended")
 		print("backup using SSH ended")
