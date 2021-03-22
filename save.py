@@ -1,10 +1,9 @@
 #!/bin/python3
-### Imports required module including custom modules in the ./modules/ folder ###
+### Imports required modules ###
 
 #Standard modules#
 import datetime
 import sys
-sys.path.append('./modules/')
 import yaml
 import os
 import shutil
@@ -16,10 +15,6 @@ import logging
 from logging.handlers import RotatingFileHandler
 import zlib
 import spur
-#Custom modules#
-import database as mariadb
-import files
-import recurchown
 
 
 
@@ -31,14 +26,14 @@ def restore(savedate,method):
 			print("Downloading file for {} archive".format(savedate.date()))
 			down_result=1
 			if method.lower() == "aws" and down_result != 0:
-				saved_archive=sys.argv[2]+".tar.gz"
+				saved_archive=sys.argv[3]+".tar.gz"
 				bucket=yaml_data.get('aws').get('bucket')
 				downloaded_backup=aws_download(saved_archive,bucket)
 				if os.path.exists(downloaded_backup):
 					down_result=0
 					backup_logger.info("Downloaded backup for the {} in {}".format(savedate,downloaded_backup))
 			elif method.lower() == "smb" and down_result != 0:
-				saved_archive=sys.argv[2]+".tar.gz"
+				saved_archive=sys.argv[3]+".tar.gz"
 				smb_credentials=yaml_data.get('smb').get('credentials')
 				smb_host=yaml_data.get('smb').get('host')+ "/" + yaml_data.get('smb').get('share')
 				smb_mount=yaml_data.get('smb').get('mount')
@@ -50,7 +45,8 @@ def restore(savedate,method):
 				try:
 					print(saved_archive,smb_mount)
 					smb_copy=smb_mount+saved_archive
-					shutil.copy(smb_copy,"/tmp/restored_smb.tar.gz")
+					smb_local_restored="/tmp/restored_smb_"+saved_archive
+					shutil.copy(smb_copy,smb_local_restored)
 					subprocess.run(['umount',smb_mount])
 					backup_logger.info("Saved archive {}, downloaded".format(smb_copy)) 
 				except:
@@ -61,20 +57,22 @@ def restore(savedate,method):
 				ssh_user=yaml_data.get('ssh').get('user')
 				ssh_key=yaml_data.get('ssh').get('key')
 				shell=spur.SshShell(hostname=ssh_host,username=ssh_user,private_key_file=ssh_key)
-				distant_file=ssh_folder+sys.argv[2]+".tar.gz"
+				distant_file=ssh_folder+sys.argv[3]+".tar.gz"
 				try:
 					with shell.open(distant_file,"rb") as remote_ssh_file:
-						with open("/tmp/restored_ssh.tar.gz","wb") as local_ssh_file:
+						ssh_local_restored="/tmp/restored_ssh_"+sys.argv[3]+".tar.gz"
+						print(ssh_local_restored)
+						with open(ssh_local_restored,"wb") as local_ssh_file:
 							shutil.copyfileobj(remote_ssh_file,local_ssh_file)
-							print("File downloaded in /tmp/restored_file.tar.gz")
-							backup_logger.info("Recovered archive {} from remote SSH host.".format(distant_file)) 
+							print("File downloaded in /tmp/")
+							backup_logger.info("Recovered archive {} from remote SSH host.".format(local_ssh_file)) 
 				except:
 					backup_logger.error("Could not download file using SSH")
 					sys.exit("Could not download file using ssh")
 
 			else:
-				backup_logger.error("Invalid type of restoration asked, usage is WP/full/down")
-				raise ValueError("Invalid type of restore asked, wp, down or full")
+				backup_logger.error("Invalid type of restoration asked, method in yaml file must be AWS, SSH or SMB")
+				raise ValueError("Invalid type of restoration asked, method in yaml file must be AWS, SSH or SMB")
 
 			print("Saved archive successfully downloaded")
 			backup_logger.info("End of restore function")
@@ -128,10 +126,12 @@ def aws_download(archived_file,bucket):
 		s3 = boto3.resource('s3')
 #		print(archived_file)
 		os.chdir("/tmp/")
-		s3.Bucket(bucket).download_file(archived_file,'restored_aws.tar.gz')
+		aws_restored_file="restored_aws_"+sys.argv[3]+".tar.gz"
+		s3.Bucket(bucket).download_file(archived_file,aws_restored_file)
 		os.chdir(cwd)
 		backup_logger.info("file restored in /tmp")
-		return("/tmp/restored_aws.tar.gz")
+		aws_restored_path="/tmp/"+aws_restored_file
+		return(aws_restored_path)
 	except:
 		backup_logger.error("Could not download saved archive")
 		sys.exit("could not wonload saved archive")
@@ -261,7 +261,7 @@ def backup(yaml_data):
 	to_delete_save=datetime.date.today() - rotation_duration
 	print("Saves older than the {} will be erased.".format(to_delete_save))
 	backup_folder="/tmp/"+"backup-"+backup_date.strftime("%Y-%m-%d")
-	subprocess.run(['mkdir','-p','--mode=777',backup_folder])
+	subprocess.run(['mkdir','-p','--mode=700',backup_folder])
 #	print(backup_folder)
 #	print(method)
 
@@ -352,13 +352,16 @@ def backup(yaml_data):
 		distant_file=ssh_folder+saved_file
 		try:
 			with shell.open(distant_file,"wb") as remote_ssh_file:
+				backup_logger.info("first with")
 				with open(saved_file_path,"rb") as local_ssh_file:
+					backup_logger.info("second with")
 					shutil.copyfileobj(local_ssh_file,remote_ssh_file)
 					backup_logger.info("Saved archive {} on remote SSH host.".format(distant_file)) 
 			with shell:
 				shell_cmd='find',ssh_folder,'-type','f','-name','*.gz','-mtime',str(yaml_data.get('rotation')),'-delete'
 				backup_logger.info("Remote files older than 7 days removed")
 
+			subprocess.run(['rm',saved_file_path])
 		except:
 			backup_logger.error("Saved archive was not transfered")
 
@@ -370,12 +373,15 @@ def backup(yaml_data):
 def import_yaml(file):
 	if isinstance(file,str):
 		print("Importing YAML")
-		try:
-			with open(file) as read_file:
-				data = yaml.load(read_file, Loader=yaml.FullLoader)
-				return(data)
-		except Exception as err:
-			print("Could not open {}, file error {}".format(file,err))
+		if os.path.exists(file):
+			try:
+				with open(file) as read_file:
+					data = yaml.load(read_file, Loader=yaml.FullLoader)
+					return(data)
+			except Exception as err:
+				print("Could not open {}, file error {}".format(file,err))
+		else:
+			sys.exit("Could not load file {}, file is not a yaml file".format(file))
 	else:
 		sys.exit("Could not import yaml file : {} is not a valid file or path".format(file))
 
@@ -384,7 +390,7 @@ def import_yaml(file):
 
 print("#####################################\n###### {} IS STARTING ###### \n ".format(sys.argv[0]))
 
-yaml_data=import_yaml("./backup_files.yaml")
+yaml_data=import_yaml(sys.argv[1])
 #print(yaml_data)
 
 
@@ -400,28 +406,28 @@ backup_logger.addHandler(backup_file_handler)
 backup_logger.info("Error handler loaded")
 
 
-if len(sys.argv) < 2:
+if len(sys.argv) < 3:
 	backup_logger.error("invalid usage not enough arguments")
-	raise ValueError("Invalid usage, usage is script backup/restore type date")
+	raise ValueError("Invalid usage, usage is [script] [yaml file] [backup] /  [restore date(YYYY-MM-DD)]")
 
-if len(sys.argv) == 2 and sys.argv[1] != "backup":
+if len(sys.argv) == 3 and sys.argv[2] != "backup":
 	backup_logger.error("Invalid usage for backup")
-	raise ValueError("Invalid usage, usage {} backup".format(sys.argv[0]))
+	raise ValueError("Invalid usage, usage {} yaml file backup".format(sys.argv[0]))
 
-if len(sys.argv) != 3 and sys.argv[1] == "restore":
+if len(sys.argv) != 4 and sys.argv[2] == "restore":
 	backup_logger.info("Invalid usage for restore")
-	raise ValueError("You must provide saved archive date, usage {} restore  date".format(sys.argv[0]))
+	raise ValueError("You must provide saved archive date, usage {} yaml file restore  date".format(sys.argv[0]))
 
 
-if sys.argv[1] == "backup" and len(sys.argv) == 2:
+if sys.argv[2] == "backup" and len(sys.argv) == 3:
 	backup_date=datetime.date.today()
 #	print(backup_date)
 	backup_logger.info("Starting backup")
 	backup(yaml_data)
 
 
-elif sys.argv[1] == "restore" and len(sys.argv) == 3:
-	savedate=datetime.datetime.strptime(sys.argv[2],'%Y-%m-%d')
+elif sys.argv[2] == "restore" and len(sys.argv) == 4:
+	savedate=datetime.datetime.strptime(sys.argv[3],'%Y-%m-%d')
 	method=yaml_data.get('backup_method')
 	restore(savedate,method)
 

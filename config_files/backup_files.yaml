@@ -1,0 +1,37 @@
+logging: "/var/log/wp_py.log"
+#method can be aws, scp or folder
+#folder needs to be given for folder option
+#folder and key file will be required for aws option
+rotation: 30
+backup_method: smb
+backup_folder: /tmp/backups
+database:
+ host: localhost
+ name: wordpress
+ admin: wordpress
+ password: wordpress
+aws:
+ bucket: localdotnet
+ region: eu-west-3
+ folder: saves/
+smb:
+ host: 192.168.1.10
+ share: saves
+ mount: /mnt/saves/
+ credentials: /root/.smbcredentials
+ssh:
+ host: 192.168.1.10
+ folder: /saves/from_ssh/
+ key: /root/.ssh/id_rsa.pub
+ user: root
+files:
+# websrv_files:
+ - /etc/apache2/apache2.conf
+# vhost_files:
+# - /etc/apache2/site-available/wp.conf
+# my:
+ - /etc/mysql/my.cnf
+# php:
+ - /etc/php/7.4/apache2/php.ini
+folders:
+ - /var/www/html/
