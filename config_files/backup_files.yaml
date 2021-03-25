@@ -1,7 +1,5 @@
 logging: "/var/log/wp_py.log"
-#method can be aws, scp or folder
-#folder needs to be given for folder option
-#folder and key file will be required for aws option
+#method can be aws, ssh or smb
 rotation: 30
 backup_method: ssh
 backup_folder: /tmp/backups
